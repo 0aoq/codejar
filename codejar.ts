@@ -1,3 +1,5 @@
+import * as autocomplete from "./autocomplete.js"
+
 const globalWindow = window
 
 type Options = {
@@ -16,6 +18,15 @@ type HistoryRecord = {
   html: string
   pos: Position
 }
+
+interface CodeJarWindow extends Window {
+  CodeJar?: HTMLElement,
+  setContent?: (html: string) => void,
+  saveCursor?: () => Position,
+  restoreCursor?: (pos: Position) => void,
+}
+
+export const CodeJarWindow = window as CodeJarWindow
 
 export type Position = {
   start: number
@@ -56,6 +67,8 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
   editor.style.overflowY = 'auto'
   editor.style.whiteSpace = 'pre-wrap'
 
+  CodeJarWindow.CodeJar = editor
+
   let isLegacy = false // true if plaintext-only is not supported
 
   highlight(editor)
@@ -90,6 +103,7 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
 
   on('keydown', event => {
     if (event.defaultPrevented) return
+    autocomplete.autoCompleteText()
 
     prev = toString()
     if (options.preserveIdent) handleNewLine(event)
@@ -116,8 +130,34 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
     if (callback) callback(toString())
   })
 
+  // handle possibleClearState
+  let possibleClearState = false
+  let removeClearStateOn = ['ArrowLeft', 'ArrowRight']
+  on('mousedown', event => {
+    possibleClearState = false
+  })
+
+  on('keydown', event => {
+    if (event.key === 'a' && event.ctrlKey && !possibleClearState) {
+      possibleClearState = true
+      return
+    }
+
+    if (event.key !== 'Backspace' && event.key === 'a' && !event.ctrlKey && possibleClearState || removeClearStateOn.includes(event.key)) {
+      possibleClearState = false
+    }
+
+    if (event.key !== 'Backspace') return
+    if (possibleClearState) {
+      event.preventDefault()
+      editor.innerHTML = ""
+      possibleClearState = false
+    }
+  })
+
   on('focus', _event => {
     focus = true
+    CodeJarWindow.CodeJar = editor
   })
 
   on('blur', _event => {
@@ -133,9 +173,9 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
 
   function save(): Position {
     const s = getSelection()
-    const pos: Position = {start: 0, end: 0, dir: undefined}
+    const pos: Position = { start: 0, end: 0, dir: undefined }
 
-    let {anchorNode, anchorOffset, focusNode, focusOffset} = s
+    let { anchorNode, anchorOffset, focusNode, focusOffset } = s
     if (!anchorNode || !focusNode) throw 'error1'
 
     // Selection anchor and focus are expected to be text nodes,
@@ -200,7 +240,7 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
 
     // Flip start and end if the direction reversed
     if (pos.dir == '<-') {
-      const {start, end} = pos
+      const { start, end } = pos
       pos.start = end
       pos.end = start
     }
@@ -342,7 +382,7 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
           const pos = save()
           // Remove full length tab or just remaining padding
           const len = Math.min(options.tab.length, padding.length)
-          restore({start, end: start + len})
+          restore({ start, end: start + len })
           document.execCommand('delete')
           pos.start -= len
           pos.end -= len
@@ -391,7 +431,7 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
     }
 
     at++
-    history[at] = {html, pos}
+    history[at] = { html, pos }
     history.splice(at + 1)
 
     const maxHistory = 300
@@ -492,14 +532,20 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
     return window.getSelection()!
   }
 
+  function updateCode(code: string) {
+    editor.textContent = code
+    highlight(editor)
+  }
+
+  CodeJarWindow.setContent = updateCode
+  CodeJarWindow.saveCursor = save
+  CodeJarWindow.restoreCursor = restore
+
   return {
     updateOptions(newOptions: Partial<Options>) {
       Object.assign(options, newOptions)
     },
-    updateCode(code: string) {
-      editor.textContent = code
-      highlight(editor)
-    },
+    updateCode,
     onUpdate(cb: (code: string) => void) {
       callback = cb
     },

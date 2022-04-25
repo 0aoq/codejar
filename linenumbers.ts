@@ -29,11 +29,11 @@ export function withLineNumbers(
     }
 
     const code = editor.textContent || ""
-    const linesCount = code.replace(/\n+$/, "\n").split("\n").length + 1
+    const linesCount = code.split(/\r\n|\r|\n/).length + (code.endsWith('\r') || code.endsWith('\n') ? 0 : 1)
 
     let text = ""
     for (let i = 1; i < linesCount; i++) {
-      text += `${i}\n`
+      text += `${i}\r\n`
     }
 
     lineNumbers.innerText = text
@@ -46,6 +46,9 @@ function init(editor: HTMLElement, opts: Options): HTMLElement {
   const wrap = document.createElement("div")
   wrap.className = opts.wrapClass
   wrap.style.position = "relative"
+  wrap.style.setProperty("overflow-x", "auto")
+  wrap.style.setProperty("overflow-y", "auto")
+  wrap.style.setProperty("resize", "vertical")
 
   const gutter = document.createElement("div")
   gutter.className = opts.class
@@ -75,11 +78,17 @@ function init(editor: HTMLElement, opts: Options): HTMLElement {
   const lineNumbers = document.createElement("div");
   lineNumbers.style.position = "relative";
   lineNumbers.style.top = "0px"
+  lineNumbers.style.overflow = "unset"
+  lineNumbers.style.setProperty("user-select", "none")
   gutter.appendChild(lineNumbers)
 
   // Tweak editor styles
   editor.style.paddingLeft = `calc(${opts.width} + ${gutter.style.paddingLeft})`
   editor.style.whiteSpace = "pre"
+  editor.style.setProperty("overflow-x", "unset")
+  editor.style.setProperty("overflow-y", "unset")
+  editor.style.setProperty("resize", "none")
+  editor.style.setProperty("min-height", "100%")
 
   // Swap editor with a wrap
   editor.parentNode!.insertBefore(wrap, editor)
