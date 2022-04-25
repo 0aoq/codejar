@@ -3,54 +3,6 @@
 import * as cursor from "./cursor.js"
 import { CodeJarWindow } from "./codejar.js"
 
-const jsKeywords = [
-    ["const", "keyword", "Create a constant variable (const name = value)"],
-    ["let", "keyword", "Create a variable (let name = value)"],
-    ["var", "keyword", "Create a variable (var name = value)"],
-    ["function", "keyword", "Create a function (function name(parameters) { code })"],
-    ["if", "keyword", "Create an if statement (if (condition) { code })"],
-    ["else", "keyword", "Create an else statement (if (condition) { code } else { code })"],
-    ["for", "keyword", "Create a for loop (for (let i = 0; i < 10; i++) { code })"],
-    ["while", "keyword", "Create a while loop (while (condition) { code })"],
-    ["switch", "keyword", "Create a switch statement (switch (condition) { case value: code; break; })"],
-    ["case", "keyword", "Create a case statement (switch (condition) { case value: code; break; })"],
-    ["break", "keyword", "Create a break statement (switch (condition) { case value: code; break; })"],
-    ["return", "keyword", "Create a return statement (return value)"],
-    ["true", "keyword"],
-    ["false", "keyword"],
-    ["null", "keyword"],
-    ["undefined", "keyword"],
-    ["NaN", "keyword"],
-    ["Infinity", "keyword"],
-    ["console", "keyword"],
-    ["document", "keyword"],
-    ["window", "keyword"],
-    ["location", "keyword"],
-    ["history", "keyword"],
-    ["navigator", "keyword"],
-    ["screen", "keyword"],
-    ["alert", "function", "Display an alert box"],
-    ["prompt", "function", "Display a prompt box"],
-    ["confirm", "function", "Display a confirm box"],
-    ["console.log", "function", "Log a message to the console"],
-    ["console.warn", "function", "Log a warning to the console"],
-    ["console.error", "function", "Log an error to the console"],
-    ["console.info", "function", "Log an info message to the console"],
-    ["console.debug", "function", "Log a debug message to the console"],
-    ["console.clear", "function", "Clear the console"],
-    ["document.getElementById", "function", "Get an element by id"],
-    ["document.getElementsByClassName", "function", "Get elements by class name"],
-    ["document.getElementsByTagName", "function", "Get elements by tag name"],
-    ["document.getElementsByName", "function", "Get elements by name"],
-    ["document.getElementsByTagNameNS", "function", "Get elements by namespace and tag name"],
-    ["document.createElement", "function", "Create an element"],
-    ["document.createTextNode", "function", "Create a text node"],
-    ["document.createComment", "function", "Create a comment"],
-    ["document.createDocumentFragment", "function", "Create a document fragment"],
-    ["document.createEvent", "function", "Create an event"],
-    ["document.createRange", "function", "Create a range"],
-]
-
 type Options = {
     class: 'codejar-autocomplete' | string
     width: '400px' | string
@@ -63,6 +15,17 @@ type Options = {
 let _options: Options
 let [modal, list, descriptionField]: [any, any, any] = [null, null, null]
 let modalVisible = false
+let currentLanguageData: any[] = []
+// let currentLanguage = 'javascript'
+
+/**
+ * Set the current language
+ * @param {string} language
+ */
+function setLanguage(language: string) {
+    if (!CodeJarWindow.languages) return
+    currentLanguageData = CodeJarWindow.languages[language].default.keywords
+}
 
 /**
  * Create an auto complete item
@@ -70,7 +33,7 @@ let modalVisible = false
  * @param {string} type - keyword, function, etc
  * @param {HTMLElement} list - the list to append the item to 
  */
-function createItem(keyword: string, type: string = '', description: string, list: HTMLElement) {
+function createItem(keyword: string, type: string = '', description: string, isPartial: boolean, list: HTMLElement) {
     const _item = document.createElement("li")
     _item.classList.add(`${_options.class}-list-item`)
     _item.innerHTML = `<span class="codejar-keyword">${keyword}</span><span class="codejar-keyword-type">[${type}]</span>`
@@ -78,6 +41,7 @@ function createItem(keyword: string, type: string = '', description: string, lis
     _item.setAttribute("data-keyword", keyword)
     _item.setAttribute("data-type", type)
     _item.setAttribute("data-description", description || "")
+    _item.setAttribute("data-is-partial", isPartial ? "true" : "false")
 
     list.appendChild(_item)
 
@@ -90,6 +54,11 @@ function createItem(keyword: string, type: string = '', description: string, lis
     }
 }
 
+/**
+ * Handle autocomplete matches
+ * @param {string} input 
+ * @param {HTMLElement} list 
+ */
 function matchAutocomplete(input: string, list: HTMLElement) {
     if (input === '') {
         modal.style.display = 'none'
@@ -97,7 +66,7 @@ function matchAutocomplete(input: string, list: HTMLElement) {
         return
     }
 
-    const matches = jsKeywords.filter(keyword => {
+    const matches = currentLanguageData.filter(keyword => {
         const regex = new RegExp(`${input}`)
         return regex.test(keyword[0])
     })
@@ -109,7 +78,7 @@ function matchAutocomplete(input: string, list: HTMLElement) {
     }
 
     for (let keyword of matches) {
-        createItem(keyword[0], keyword[1], keyword[2], list)
+        createItem(keyword[0], keyword[1], keyword[2], keyword[3], list)
     }
 }
 
@@ -200,7 +169,27 @@ let currentItem: HTMLElement | any = null
 
 let eventListenerFunctions: any[] = []
 
+/**
+ * Event listener for autocomplete suggestions
+ * @param {KeyboardEvent} e 
+ */
 const currentWordListener = (e: KeyboardEvent) => {
+    // helper functions
+    function removeEmpty(array: any[]): any[] {
+        let newArray = []
+        
+        for (let i = 0; i < array.length; i++) {
+            if (array[i] !== undefined && array[i].length > 0) newArray.push(array[i])
+        }
+
+        return newArray
+    }
+
+    function replaceOn(string: string, index: number, replacement: string) {
+        return string.substring(0, index) + replacement + string.substring(index + replacement.length)
+    }
+
+    // event
     eventListenerFunctions.push(() => {
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab') {
             const text = cursor.textBeforeCursor(editor)
@@ -251,29 +240,22 @@ const currentWordListener = (e: KeyboardEvent) => {
                         const type = currentItem.getAttribute('data-type')
                         
                         const text = cursor.textBeforeCursor(editor)
-                        const lines =  text.split("\n")
+                        let lines =  text.split("\n")
                         let lastLine = lines[lines.length - 1]
 
                         for (let i = 0; i < lines.length; i++) {
+                            // remove all empty/whitespace lines
                             if (lines[i] === "\t") delete lines[i]
                             if (lines[i]) lines[i] = lines[i].replace("\t", "")
                         }
 
-                        function getLast(array: any[]): any[] {
-                            let newArray = []
-                            
-                            for (let i = 0; i < array.length; i++) {
-                                if (array[i] !== undefined) newArray.push(array[i])
-                            }
-
-                            return newArray
-                        }
-
+                        lines = removeEmpty(lines) // remove whitespace characters from lines
                         lastLine = lines[lines.length - 1]
 
                         let split = lastLine.split(" ")
 
                         for (let i = 0; i < split.length; i++) {
+                            // remove all empty/whitespace words
                             if (split[i] === "" || split[i] === "\t") delete split[i]
                             else split[i] = split[i].replace("\t", "")
                         }
@@ -288,14 +270,14 @@ const currentWordListener = (e: KeyboardEvent) => {
                         }
 
                         newLine = newLine.replace(lastValue, keyword)
-                        const newText = text.replace(lastLine, newLine)
+                        const newText = replaceOn(text, text.lastIndexOf(lastLine), newLine)
 
                         // add to editor
                         CodeJarWindow.setContent(newText + cursor.textAfterCursor(editor))
 
                         // replace cursor
-                        position.start = position.start + keyword.length
-                        position.end = position.end + keyword.length
+                        position.start = (newText.length - 1) + 1
+                        position.end = (newText.length - 1) + 1
                         CodeJarWindow.restoreCursor(position)
 
                         // reset currentItem
@@ -325,6 +307,9 @@ const currentWordListener = (e: KeyboardEvent) => {
     eventListenerFunctions[eventListenerFunctions.length - 1]()
 }
 
+/**
+ * Event listener for hiding the autocomplete modal
+ */
 const clickListener = () => {
     eventListenerFunctions.push(() => {
         modal.style.display = "none"
@@ -335,6 +320,9 @@ const clickListener = () => {
     eventListenerFunctions[eventListenerFunctions.length - 1]()
 }
 
+/**
+ * Event listener for hiding the autocomplete modal
+ */
 const blurListener = () => {
     eventListenerFunctions.push(() => {
         modal.style.display = "none"
@@ -382,4 +370,5 @@ export function autoCompleteText() {
 
 setTimeout(() => {
     editor = CodeJarWindow.CodeJar
+    setLanguage("javascript")
 }, 100);

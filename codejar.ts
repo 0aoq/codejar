@@ -24,9 +24,22 @@ interface CodeJarWindow extends Window {
   setContent?: (html: string) => void,
   saveCursor?: () => Position,
   restoreCursor?: (pos: Position) => void,
+  languages?: any
+}
+
+interface LanguageOptions {
+  language: {
+    name: string,
+    extensions: string[],
+  },
+
+  keywords: {
+    [key: string]: string[]
+  }
 }
 
 export const CodeJarWindow = window as CodeJarWindow
+CodeJarWindow.languages = [] as LanguageOptions[]
 
 export type Position = {
   start: number
@@ -548,6 +561,9 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
     updateCode,
     onUpdate(cb: (code: string) => void) {
       callback = cb
+    },
+    addLanguage(name: string, options: LanguageOptions) {
+      CodeJarWindow.languages[name] = options
     },
     toString,
     save,

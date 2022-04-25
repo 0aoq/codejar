@@ -44,6 +44,7 @@
 </main>
 <script type="module">
   import {CodeJar} from './codejar.js'
+  import * as JavaScriptData from './languages/javascript/javascript.js'
   import {withLineNumbers} from './linenumbers.js'
 
   const editor = document.querySelector('.editor')
@@ -61,6 +62,8 @@
   jar.onUpdate(code => {
     localStorage.setItem('code', code)
   })
+
+  jar.addLanguage('javascript', JavaScriptData)
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
 </body>
