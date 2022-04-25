@@ -34,11 +34,14 @@ function setLanguage(language: string) {
  * @param {HTMLElement} list - the list to append the item to 
  */
 function createItem(keyword: string, type: string = '', description: string, isPartial: boolean, list: HTMLElement) {
+    keyword = keyword.replace("<", "&lt;")
+    keyword = keyword.replace(">", "&gt;")
+
     const _item = document.createElement("li")
     _item.classList.add(`${_options.class}-list-item`)
     _item.innerHTML = `<span class="codejar-keyword">${keyword}</span><span class="codejar-keyword-type">[${type}]</span>`
 
-    _item.setAttribute("data-keyword", keyword)
+    _item.setAttribute("data-keyword", keyword.replace("&lt;", "<").replace("&gt;", ">"))
     _item.setAttribute("data-type", type)
     _item.setAttribute("data-description", description || "")
     _item.setAttribute("data-is-partial", isPartial ? "true" : "false")
@@ -169,29 +172,97 @@ let currentItem: HTMLElement | any = null
 
 let eventListenerFunctions: any[] = []
 
+// helper functions
+function removeEmpty(array: any[]): any[] {
+    let newArray = []
+    
+    for (let i = 0; i < array.length; i++) {
+        if (array[i] !== undefined && array[i].length > 0) newArray.push(array[i])
+    }
+
+    return newArray
+}
+
+function replaceOn(string: string, index: number, replacement: string) {
+    return string.substring(0, index) + replacement + string.substring(index + replacement.length)
+}
+
+/**
+ * Submit the current item
+ */
+const submitItem = (e: KeyboardEvent) => {
+    if (currentItem) {
+        if (!CodeJarWindow.setContent || !CodeJarWindow.saveCursor || !CodeJarWindow.restoreCursor) return
+        e.preventDefault()
+        const position = CodeJarWindow.saveCursor()
+
+        let keyword = currentItem.getAttribute('data-keyword')
+        const type = currentItem.getAttribute('data-type')
+        
+        const text = cursor.textBeforeCursor(editor)
+        let lines =  text.split("\n")
+        let lastLine = lines[lines.length - 1]
+
+        for (let i = 0; i < lines.length; i++) {
+            // remove all empty/whitespace lines
+            if (lines[i] === "\t") delete lines[i]
+            if (lines[i]) lines[i] = lines[i].replace("\t", "")
+        }
+
+        lines = removeEmpty(lines) // remove whitespace characters from lines
+        lastLine = lines[lines.length - 1]
+
+        let split = lastLine.split(" ")
+
+        for (let i = 0; i < split.length; i++) {
+            // remove all empty/whitespace words
+            if (split[i] === "" || split[i] === "\t") delete split[i]
+            else split[i] = split[i].replace("\t", "")
+        }
+
+        let lastValue = split[split.length - 1]
+        delete split[split.length - 1]
+
+        let newLine = lastLine
+
+        if (type === "function") {
+            keyword += "()"
+        }
+
+        newLine = newLine.replace(lastValue, keyword)
+        const newText = replaceOn(text, text.lastIndexOf(lastLine), newLine)
+
+        // add to editor
+        CodeJarWindow.setContent(newText + cursor.textAfterCursor(editor))
+
+        // replace cursor
+        position.start = (newText.length - 1) + 1
+        position.end = (newText.length - 1) + 1
+        CodeJarWindow.restoreCursor(position)
+
+        // reset currentItem
+        currentItem = null
+        currentWord = ""
+
+        modalVisible = false
+        modal.style.display = "none"
+    }
+}
+
 /**
  * Event listener for autocomplete suggestions
  * @param {KeyboardEvent} e 
  */
 const currentWordListener = (e: KeyboardEvent) => {
-    // helper functions
-    function removeEmpty(array: any[]): any[] {
-        let newArray = []
-        
-        for (let i = 0; i < array.length; i++) {
-            if (array[i] !== undefined && array[i].length > 0) newArray.push(array[i])
-        }
-
-        return newArray
-    }
-
-    function replaceOn(string: string, index: number, replacement: string) {
-        return string.substring(0, index) + replacement + string.substring(index + replacement.length)
-    }
-
     // event
     eventListenerFunctions.push(() => {
-        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab') {
+        // if the last character in cursor.textBeforeCursor is whitespace or a tab, return
+        const _textBefore = cursor.textBeforeCursor(editor)
+        const _lastCharacter = _textBefore[_textBefore.length - 1]
+        if (_lastCharacter.length <= 0 || _lastCharacter === '\t' || _lastCharacter === '\n') return
+
+        // handle actions
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab' && !currentItem) {
             const text = cursor.textBeforeCursor(editor)
             const lastWord = text.split(/[^a-zA-Z.]+/g).pop()
             if (text[text.length - 1] !== " " && lastWord) currentWord = lastWord
@@ -231,62 +302,11 @@ const currentWordListener = (e: KeyboardEvent) => {
                         currentItem.classList.add('selected')
                     }
                 } else if (e.key === 'Enter' || e.key === 'Tab') {
-                    if (currentItem) {
-                        if (!CodeJarWindow.setContent || !CodeJarWindow.saveCursor || !CodeJarWindow.restoreCursor) return
-                        e.preventDefault()
-                        const position = CodeJarWindow.saveCursor()
-
-                        let keyword = currentItem.getAttribute('data-keyword')
-                        const type = currentItem.getAttribute('data-type')
-                        
-                        const text = cursor.textBeforeCursor(editor)
-                        let lines =  text.split("\n")
-                        let lastLine = lines[lines.length - 1]
-
-                        for (let i = 0; i < lines.length; i++) {
-                            // remove all empty/whitespace lines
-                            if (lines[i] === "\t") delete lines[i]
-                            if (lines[i]) lines[i] = lines[i].replace("\t", "")
-                        }
-
-                        lines = removeEmpty(lines) // remove whitespace characters from lines
-                        lastLine = lines[lines.length - 1]
-
-                        let split = lastLine.split(" ")
-
-                        for (let i = 0; i < split.length; i++) {
-                            // remove all empty/whitespace words
-                            if (split[i] === "" || split[i] === "\t") delete split[i]
-                            else split[i] = split[i].replace("\t", "")
-                        }
-
-                        let lastValue = split[split.length - 1]
-                        delete split[split.length - 1]
-
-                        let newLine = lastLine
-
-                        if (type === "function") {
-                            keyword += "()"
-                        }
-
-                        newLine = newLine.replace(lastValue, keyword)
-                        const newText = replaceOn(text, text.lastIndexOf(lastLine), newLine)
-
-                        // add to editor
-                        CodeJarWindow.setContent(newText + cursor.textAfterCursor(editor))
-
-                        // replace cursor
-                        position.start = (newText.length - 1) + 1
-                        position.end = (newText.length - 1) + 1
-                        CodeJarWindow.restoreCursor(position)
-
-                        // reset currentItem
-                        currentItem = null
-                        currentWord = ""
-
-                        modalVisible = false
-                        modal.style.display = "none"
-                    }
+                    submitItem(e)
+                } else if (e.key === "Escape") {
+                    modalVisible = false
+                    modal.style.display = "none"
+                    currentItem = null
                 }
 
                 // update description field
@@ -370,5 +390,13 @@ export function autoCompleteText() {
 
 setTimeout(() => {
     editor = CodeJarWindow.CodeJar
-    setLanguage("javascript")
+    setLanguage("html")
+
+    editor.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            submitItem(e)
+            modalVisible = false
+            modal.style.display = "none"
+        }
+    })
 }, 100);
