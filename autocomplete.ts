@@ -251,38 +251,51 @@ const currentWordListener = (e: KeyboardEvent) => {
                         const type = currentItem.getAttribute('data-type')
                         
                         const text = cursor.textBeforeCursor(editor)
-                        const lastLine = text.split(/\n/g)[text.split(/\n/g).length - 1]
-                        const lastWord = text.split(" ")[text.split(" ").length - 1]
-                        /* const before = text.split(lastWord)[0] || ""
-                        let after = cursor.textAfterCursor(editor)
+                        const lines =  text.split("\n")
+                        let lastLine = lines[lines.length - 1]
 
-                        // if type is function, then add ()
-                        if (type === "function") {
-                            after = "()" + after
+                        for (let i = 0; i < lines.length; i++) {
+                            if (lines[i] === "\t") delete lines[i]
+                            if (lines[i]) lines[i] = lines[i].replace("\t", "")
+                        }
 
-                            position.start++
-                            position.end++
-                        } */
+                        function getLast(array: any[]): any[] {
+                            let newArray = []
+                            
+                            for (let i = 0; i < array.length; i++) {
+                                if (array[i] !== undefined) newArray.push(array[i])
+                            }
+
+                            return newArray
+                        }
+
+                        lastLine = lines[lines.length - 1]
+
+                        let split = lastLine.split(" ")
+
+                        for (let i = 0; i < split.length; i++) {
+                            if (split[i] === "" || split[i] === "\t") delete split[i]
+                            else split[i] = split[i].replace("\t", "")
+                        }
+
+                        let lastValue = split[split.length - 1]
+                        delete split[split.length - 1]
+
+                        let newLine = lastLine
 
                         if (type === "function") {
                             keyword += "()"
-
-                            position.start -= 1
-                            position.end -= 1
                         }
 
-                        if (keyword.startsWith(lastLine.split(" ")[lastLine.split(" ").length - 1]) && !keyword.search(keyword.substr(lastWord.length))) {
-                            e.preventDefault()
-                            descriptionField.innerHTML = `Best Match: <b> ${keyword} </b>`
-                            return
-                        }
+                        newLine = newLine.replace(lastValue, keyword)
+                        const newText = text.replace(lastLine, newLine)
 
                         // add to editor
-                        CodeJarWindow.setContent(text.replace(lastWord, keyword))
+                        CodeJarWindow.setContent(newText + cursor.textAfterCursor(editor))
 
                         // replace cursor
-                        position.start = position.start - lastWord.length + keyword.length
-                        position.end = position.end - lastWord.length + keyword.length
+                        position.start = position.start + keyword.length
+                        position.end = position.end + keyword.length
                         CodeJarWindow.restoreCursor(position)
 
                         // reset currentItem
