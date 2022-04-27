@@ -15,7 +15,7 @@ type Options = {
 let _options: Options
 let [modal, list, descriptionField]: [any, any, any] = [null, null, null]
 let modalVisible = false
-let currentLanguageData: any[] = []
+let currentLanguageData: any = []
 // let currentLanguage = 'javascript'
 
 /**
@@ -24,7 +24,7 @@ let currentLanguageData: any[] = []
  */
 function setLanguage(language: string) {
     if (!CodeJarWindow.languages) return
-    currentLanguageData = CodeJarWindow.languages[language].default.keywords
+    currentLanguageData = CodeJarWindow.languages[language].default
 }
 
 /**
@@ -33,25 +33,31 @@ function setLanguage(language: string) {
  * @param {string} type - keyword, function, etc
  * @param {HTMLElement} list - the list to append the item to 
  */
-function createItem(keyword: string, type: string = '', description: string, isPartial: boolean, list: HTMLElement) {
-    keyword = keyword.replace("<", "&lt;")
-    keyword = keyword.replace(">", "&gt;")
+function createItem(options: { name?: string, keyword: string, type: string, description: string, isPartial: boolean }, list: HTMLElement) {
+    options.keyword = options.keyword.replace("<", "&lt;")
+    options.keyword = options.keyword.replace(">", "&gt;")
 
     const _item = document.createElement("li")
     _item.classList.add(`${_options.class}-list-item`)
-    _item.innerHTML = `<span class="codejar-keyword">${keyword}</span><span class="codejar-keyword-type">[${type}]</span>`
+    _item.innerHTML = `<span class="codejar-keyword">${options.name || options.keyword}</span><span class="codejar-keyword-type">[${options.type}]</span>`
 
-    _item.setAttribute("data-keyword", keyword.replace("&lt;", "<").replace("&gt;", ">"))
-    _item.setAttribute("data-type", type)
-    _item.setAttribute("data-description", description || "")
-    _item.setAttribute("data-is-partial", isPartial ? "true" : "false")
+    /* if (options.keyword.includes(".")) options.isPartial = true
+    if (options.isPartial) {
+        options.keyword = options.keyword.split(".")[1]
+    } */
+
+    _item.setAttribute("data-keyword", options.keyword.replace("&lt;", "<").replace("&gt;", ">"))
+    _item.setAttribute("data-type", options.type)
+    _item.setAttribute("data-description", options.description || "")
+    _item.setAttribute("data-is-partial", options.isPartial ? "true" : "false")
+    _item.setAttribute("data-name", options.name || options.keyword)
 
     list.appendChild(_item)
 
     // add a description
-    if (description) {
+    if (options.description) {
         descriptionField.style.display = 'block'
-        descriptionField.innerText = description
+        descriptionField.innerText = options.description
     } else {
         descriptionField.style.display = 'none'
     }
@@ -69,7 +75,28 @@ function matchAutocomplete(input: string, list: HTMLElement) {
         return
     }
 
-    const matches = currentLanguageData.filter(keyword => {
+     (() => {
+        // handle snippet match
+        if (!currentLanguageData.snippets) return
+        const _matches = currentLanguageData.snippets.filter((snippet: any) => {
+            const regex = new RegExp(`${input}`)
+            return regex.test(snippet[0])
+        })
+
+        for (let snippet of _matches) {
+            // [name, text, description]
+            createItem({
+                name: snippet[0],
+                keyword: snippet[1],
+                description: snippet[2],
+                isPartial: false,
+                type: "snippet",
+            }, list)
+        }
+    })()
+
+    // normal keyword matching
+    const matches = currentLanguageData.keywords.filter((keyword: any) => {
         const regex = new RegExp(`${input}`)
         return regex.test(keyword[0])
     })
@@ -81,7 +108,14 @@ function matchAutocomplete(input: string, list: HTMLElement) {
     }
 
     for (let keyword of matches) {
-        createItem(keyword[0], keyword[1], keyword[2], keyword[3], list)
+        // [text, type, description, isPartial, name]
+        createItem({
+            name: keyword[4],
+            keyword: keyword[0],
+            type: keyword[1],
+            description: keyword[2],
+            isPartial: keyword[3] || false
+        }, list)
     }
 }
 
@@ -175,7 +209,7 @@ let eventListenerFunctions: any[] = []
 // helper functions
 function removeEmpty(array: any[]): any[] {
     let newArray = []
-    
+
     for (let i = 0; i < array.length; i++) {
         if (array[i] !== undefined && array[i].length > 0) newArray.push(array[i])
     }
@@ -198,9 +232,9 @@ const submitItem = (e: KeyboardEvent) => {
 
         let keyword = currentItem.getAttribute('data-keyword')
         const type = currentItem.getAttribute('data-type')
-        
+
         const text = cursor.textBeforeCursor(editor)
-        let lines =  text.split("\n")
+        let lines = text.split("\n")
         let lastLine = lines[lines.length - 1]
 
         for (let i = 0; i < lines.length; i++) {
@@ -390,7 +424,7 @@ export function autoCompleteText() {
 
 setTimeout(() => {
     editor = CodeJarWindow.CodeJar
-    setLanguage("html")
+    setLanguage("javascript")
 
     editor.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Enter' || e.key === 'Tab') {

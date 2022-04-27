@@ -86,5 +86,7 @@ export default {
         ["element.getElementsByTagNameNS", "function", "Get elements by namespace and tag name"],
         ["element.getElementsByClassName", "function", "Get elements by class name"],
         ["element.getElementsByName", "function", "Get elements by name"]
-    ]
+    ],
+
+    "snippets": []
 }
