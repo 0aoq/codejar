@@ -24,7 +24,8 @@ interface CodeJarWindow extends Window {
   setContent?: (html: string) => void,
   saveCursor?: () => Position,
   restoreCursor?: (pos: Position) => void,
-  languages?: any
+  languages?: any,
+  themes?: any
 }
 
 interface LanguageOptions {
@@ -38,8 +39,11 @@ interface LanguageOptions {
   }
 }
 
+let autoCompleteOptions: any = {}
+
 export const CodeJarWindow = window as CodeJarWindow
 CodeJarWindow.languages = [] as LanguageOptions[]
+CodeJarWindow.themes = {} as any
 
 export type Position = {
   start: number
@@ -79,6 +83,8 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
   editor.style.overflowWrap = 'break-word'
   editor.style.overflowY = 'auto'
   editor.style.whiteSpace = 'pre-wrap'
+  editor.classList.add('codejar-editor')
+  if (!editor.id) editor.id = 'codejar-editor-' + document.querySelectorAll('.codejar-editor').length
 
   CodeJarWindow.CodeJar = editor
 
@@ -116,7 +122,7 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
 
   on('keydown', event => {
     if (event.defaultPrevented) return
-    autocomplete.autoCompleteText()
+    autocomplete.autoCompleteText(autoCompleteOptions)
 
     prev = toString()
     if (options.preserveIdent) handleNewLine(event)
@@ -562,9 +568,52 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
     onUpdate(cb: (code: string) => void) {
       callback = cb
     },
+
     addLanguage(name: string, options: LanguageOptions) {
       CodeJarWindow.languages[name] = options
     },
+
+    addTheme(_module: any) {
+      if (!_module.import || !_module.editor || !CodeJarWindow.themes) return
+
+      // add options
+      CodeJarWindow.themes[_module.name] = _module
+    },
+    setTheme(name: string) {
+      if (!CodeJarWindow.themes || !CodeJarWindow.themes[name] || !editor.parentElement) return
+      const theme = CodeJarWindow.themes[name]
+
+      if (document.getElementById("codejar-currentTheme")) {
+        document.getElementById("codejar-currentTheme")?.remove()
+      }
+
+      // add stylesheet
+      document.head.insertAdjacentHTML('beforeend', `<link href="${theme.import}" rel="stylesheet" id="codejar-currentTheme">`)
+
+      // general editor
+      editor.parentElement.insertAdjacentHTML('beforeend', `<style>
+        #${editor.id} {
+          background: ${theme.editor["editor.background"]} !important;
+        }
+      </style>`)
+
+      // remove autocomplete
+      autocomplete.destroy()
+      
+      // set autocomplete options
+      autoCompleteOptions["altbackground"] = theme.editor["editor.autocomplete.background"]
+
+      // line numbers
+      const lineNumbers = document.getElementsByClassName("codejar-linenumbers")[0] as HTMLElement
+      let textColor = (theme.editor["editor.autocomplete.background"] < 127.5) as any
+
+      if (textColor) textColor = "#FFF"
+      else textColor = "#000"
+
+      if (!lineNumbers) return
+      lineNumbers.style.color = textColor as string
+    },
+    
     toString,
     save,
     restore,

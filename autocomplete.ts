@@ -6,13 +6,13 @@ import { CodeJarWindow } from "./codejar.js"
 type Options = {
     class: 'codejar-autocomplete' | string
     width: '400px' | string
-    backgroundColor: 'rgb(245, 245, 245)' | string
-    backgroundDarker: 'rgb(238, 238, 238)' | string
+    backgroundColor: 245 | any
+    backgroundDarker?: 238| any // backgroundColor - 7
     modalPadding: '4px' | string
     itemPadding: '4px 2rem' | string
 }
 
-let _options: Options
+let _options: Options | any
 let [modal, list, descriptionField]: [any, any, any] = [null, null, null]
 let modalVisible = false
 let currentLanguageData: any = []
@@ -75,7 +75,7 @@ function matchAutocomplete(input: string, list: HTMLElement) {
         return
     }
 
-     (() => {
+    (() => {
         // handle snippet match
         if (!currentLanguageData.snippets) return
         const _matches = currentLanguageData.snippets.filter((snippet: any) => {
@@ -123,30 +123,45 @@ function matchAutocomplete(input: string, list: HTMLElement) {
  * Initialize the autocomplete modal
  * @param {Partial<Options>} options 
  */
-function init(options: Partial<Options> = {}) {
+export function init(options: Partial<Options> = {}) {
     _options = {
         class: 'codejar-autocomplete',
         width: '400px',
-        backgroundColor: 'rgb(245, 245, 245)',
-        backgroundDarker: 'rgb(238, 238, 238)',
+        backgroundColor: 245,
         modalPadding: '4px',
         itemPadding: '4px 8px',
         ...options
     }
 
+    if (_options.altbackground) _options.backgroundColor = _options.altbackground
+
+    let backgroundColor = (_options.backgroundColor)
+    let backgroundDarker = (_options.backgroundColor - 7)
+    let textColor = (255 - backgroundColor)
+
+    _options.backgroundDarker = backgroundDarker
+    _options.backgroundColor = `rgb(${backgroundColor}, ${backgroundColor}, ${backgroundColor})`
+    _options.backgroundDarker = `rgb(${backgroundDarker}, ${backgroundDarker}, ${backgroundDarker})`
+
+    if (backgroundColor < 127.5) textColor = (255 - backgroundColor)
+    else textColor = 0
+
+    const borderColor = (backgroundDarker - 20)
+
     if (CodeJarWindow.CodeJar && CodeJarWindow.CodeJar.parentElement) {
-        CodeJarWindow.CodeJar.parentElement.insertAdjacentHTML('beforeend', `<style>
+        CodeJarWindow.CodeJar.parentElement.insertAdjacentHTML('beforeend', `<style id="codejar-autocomlete-styles">
             .codejar-modal {\nposition: absolute;\nz-index: 20;\n}
             .${_options.class} {
                 display: none;
                 width: ${_options.width};
                 background-color: ${_options.backgroundColor};
-                border: 1px solid #ccc;
+                border: 1px solid rgb(${borderColor}, ${borderColor}, ${borderColor});
                 border-radius: 4px;
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
                 padding: ${_options.modalPadding};
                 font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                 font-size: 12px;
+                color: rgb(${textColor}, ${textColor}, ${textColor})
             }
             
             .${_options.class} .${_options.class}-list {
@@ -155,18 +170,18 @@ function init(options: Partial<Options> = {}) {
             }
             .${_options.class} .${_options.class}-list-item {
                 display: block;\npadding: ${_options.itemPadding};\nborder-radius: 4px;
-                transition: all 0.08s ease-in-out;\noutline: 0 solid #ccc;
-                cursor: pointer;\nwidth: 95%;\nmargin: 0 auto;
+                transition: all 0.08s ease-in-out;\noutline: 1px solid transparent;
+                cursor: pointer;\nwidth: 95%;\nmargin: 0 auto; color: rgb(${textColor}, ${textColor}, ${textColor})
             }
             .${_options.class} .${_options.class}-list-item.selected {
                 background-color: ${_options.backgroundDarker};
-                outline: 1px solid #ccc;
+                outline: 1px solid rgb(${borderColor}, ${borderColor}, ${borderColor});
             }
 
             .codejar-keyword-type {\nopacity: 0.25;\nmargin-left: 1.2rem;\n
             .codejar-keyword {\nopactiy: 0.5;\n}
 
-            .${_options.class}-description {\nopacity: 0.5;\nbackground-color: ${_options.backgroundDarker};\n}
+            .${_options.class}-description {\n/opacity: 0.5;\nbackground-color: ${_options.backgroundDarker};\n}
         `)
     }
 
@@ -189,7 +204,7 @@ function init(options: Partial<Options> = {}) {
     _descriptionField.style.padding = "4px 8px"
     _descriptionField.style.marginTop = '0.5rem'
     _descriptionField.style.borderRadius = '4px'
-    _descriptionField.style.border = '1px solid #ccc'
+    _descriptionField.style.border = `1px solid rgb(${borderColor}, ${borderColor}, ${borderColor})`
     _modal.appendChild(_descriptionField)
 
     // assign the modal to a global variable
@@ -219,6 +234,25 @@ function removeEmpty(array: any[]): any[] {
 
 function replaceOn(string: string, index: number, replacement: string) {
     return string.substring(0, index) + replacement + string.substring(index + replacement.length)
+}
+
+const hideModal = () => {
+    currentItem = null
+    currentWord = ""
+
+    modalVisible = false
+    modal.style.display = "none"
+}
+
+const showModal = () => {
+    modal.style.display = "block"
+    modalVisible = true
+}
+
+function replaceLast(input: string, pattern: string, value: string) {
+    const lastIndex = input.lastIndexOf(pattern)
+    if (lastIndex < 0) return input
+    return input.substring(0, lastIndex) + value + input.substring(lastIndex + pattern.length)
 }
 
 /**
@@ -263,9 +297,19 @@ const submitItem = (e: KeyboardEvent) => {
             keyword += "()"
         }
 
-        newLine = newLine.replace(lastValue, keyword)
-        const newText = replaceOn(text, text.lastIndexOf(lastLine), newLine)
+        // handle inside parenthesis
+        let requireFunctionOpen = false
+        if (lastValue.indexOf("(") !== -1) {
+            // if there is no space between the value and a (
+            lastValue = replaceLast(lastValue, lastValue.split("(")[0], "")
+            if (lastValue.indexOf("(") !== -1) lastValue = lastLine.split("(")[1]
+            requireFunctionOpen = true
+        }
 
+        // replace
+        newLine = replaceLast(newLine, `${requireFunctionOpen ? "(" : ""}${lastValue}`, keyword)
+        const newText = replaceOn(text, text.lastIndexOf(lastLine), newLine)
+    
         // add to editor
         CodeJarWindow.setContent(newText + cursor.textAfterCursor(editor))
 
@@ -275,11 +319,7 @@ const submitItem = (e: KeyboardEvent) => {
         CodeJarWindow.restoreCursor(position)
 
         // reset currentItem
-        currentItem = null
-        currentWord = ""
-
-        modalVisible = false
-        modal.style.display = "none"
+        hideModal()
     }
 }
 
@@ -292,17 +332,29 @@ const currentWordListener = (e: KeyboardEvent) => {
     eventListenerFunctions.push(() => {
         // if the last character in cursor.textBeforeCursor is whitespace or a tab, return
         const _textBefore = cursor.textBeforeCursor(editor)
+        if (!_textBefore) return
         const _lastCharacter = _textBefore[_textBefore.length - 1]
         if (_lastCharacter.length <= 0 || _lastCharacter === '\t' || _lastCharacter === '\n') return
 
         // handle actions
-        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab' && !currentItem) {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab') {
+            if (e.key === 'Backspace') return hideModal()
             const text = cursor.textBeforeCursor(editor)
             const lastWord = text.split(/[^a-zA-Z.]+/g).pop()
             if (text[text.length - 1] !== " " && lastWord) currentWord = lastWord
 
             list.innerHTML = ""
-            matchAutocomplete(currentWord, list)
+            matchAutocomplete(currentWord, list);
+
+            (() => {
+                // automatically select the first item in the list
+                const items = list.querySelectorAll(`.${_options.class}-list-item`)
+                if (items.length < 1) return hideModal()
+
+                currentItem = null
+                currentItem = items[0]
+                if (currentItem) currentItem.classList.add('selected')
+            })()
         } else {
             const items = list.querySelectorAll(`.${_options.class}-list-item`)
             if (items.length > 0 && modalVisible) {
@@ -337,11 +389,7 @@ const currentWordListener = (e: KeyboardEvent) => {
                     }
                 } else if (e.key === 'Enter' || e.key === 'Tab') {
                     submitItem(e)
-                } else if (e.key === "Escape") {
-                    modalVisible = false
-                    modal.style.display = "none"
-                    currentItem = null
-                }
+                } else if (e.key === "Escape") hideModal()
 
                 // update description field
                 if (currentItem) {
@@ -391,7 +439,7 @@ const blurListener = () => {
  * Start the auto complete modal
  * @returns {HTMLElement} the modal
  */
-export function autoCompleteText() {
+export function autoCompleteText(options?: Partial<Options>) {
     // remove all listeners from the editor
     for (let listener of eventListenerFunctions) {
         editor.removeEventListener('keydown', listener)
@@ -403,7 +451,7 @@ export function autoCompleteText() {
     editor = CodeJarWindow.CodeJar
 
     if (!modal || !list) {
-        [modal, list, descriptionField] = init()
+        [modal, list, descriptionField] = init(options)
     }
 
     const cursorPosition = cursor.cursorPosition()
@@ -411,8 +459,7 @@ export function autoCompleteText() {
 
     modal.style.top = cursorPosition.top
     modal.style.left = cursorPosition.left
-    modal.style.display = "block"
-    modalVisible = true
+    showModal()
 
     // handle current word
     editor.addEventListener('keydown', currentWordListener)
@@ -420,6 +467,15 @@ export function autoCompleteText() {
     // hide modal on click or blur
     editor.addEventListener('click', clickListener, { passive: true })
     editor.addEventListener("blur", blurListener, { passive: true })
+}
+
+/**
+ * Remove the autocomplete dialog and its options
+ */
+export function destroy() {
+    if (!modal) return
+    modal.remove()
+    document.getElementById("codejar-autocomlete-styles")?.remove()
 }
 
 setTimeout(() => {

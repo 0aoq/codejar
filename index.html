@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>CodeJar – a micro code editor</title>
     <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/styles/github.min.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -35,6 +34,7 @@
             line-height: 20px;
             padding: 10px;
             tab-size: 4;
+            overflow: auto;
         }
     </style>
 </head>
@@ -44,8 +44,13 @@
 </main>
 <script type="module">
   import {CodeJar} from './codejar.js'
+
   import * as JavaScriptData from './languages/javascript/javascript.js'
   import * as HTMLData from './languages/html/html.js'
+
+  import * as agate from './themes/agate.js'
+  import * as github from './themes/github.js'
+
   import {withLineNumbers} from './linenumbers.js'
 
   const editor = document.querySelector('.editor')
@@ -66,6 +71,10 @@
 
   jar.addLanguage('javascript', JavaScriptData)
   jar.addLanguage('html', HTMLData)
+
+  jar.addTheme(agate.default)
+  jar.addTheme(github.default)
+  jar.setTheme('agate')
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
 </body>
