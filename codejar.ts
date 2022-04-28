@@ -603,14 +603,11 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
         }
       </style>`)
 
-      // remove autocomplete
-      autocomplete.destroy()
+      autocomplete.init(autoCompleteOptions)
       
       // set autocomplete options
       autoCompleteOptions["altbackground"] = theme.editor["editor.autocomplete.background"]
-
-      // init autocomplete
-      autocomplete.init(autoCompleteOptions)
+      autocomplete.destroy(autoCompleteOptions)
 
       // line numbers
       const lineNumbers = document.getElementsByClassName("codejar-linenumbers")[0] as HTMLElement

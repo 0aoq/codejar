@@ -24,6 +24,7 @@ let currentLanguageData: any = []
  */
 export function setLanguage(language: string) {
     if (!CodeJarWindow.languages) return
+    hideModal()
     currentLanguageData = CodeJarWindow.languages[language].default
 }
 
@@ -37,22 +38,38 @@ function createItem(options: { name?: string, keyword: string, type: string, des
     options.keyword = options.keyword.replace("<", "&lt;")
     options.keyword = options.keyword.replace(">", "&gt;")
 
-    const _item = document.createElement("li")
-    _item.classList.add(`${_options.class}-list-item`)
-    _item.innerHTML = `<span class="codejar-keyword">${options.name || options.keyword}</span><span class="codejar-keyword-type">[${options.type}]</span>`
+    let icon =`<svg xmlns="http://www.w3.org/2000/svg" 
+            width="24" 
+            height="24" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            stroke-width="2" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            class="feather feather-box"
+            style="width: 1rem; height: 1rem; margin-top: 0.05rem;"
+        >
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+        </svg>`
 
-    /* if (options.keyword.includes(".")) options.isPartial = true
-    if (options.isPartial) {
-        options.keyword = options.keyword.split(".")[1]
-    } */
-
-    _item.setAttribute("data-keyword", options.keyword.replace("&lt;", "<").replace("&gt;", ">"))
-    _item.setAttribute("data-type", options.type)
-    _item.setAttribute("data-description", options.description || "")
-    _item.setAttribute("data-is-partial", options.isPartial ? "true" : "false")
-    _item.setAttribute("data-name", options.name || options.keyword)
-
-    for (let i = 0; i < 5; i++) list.appendChild(_item)
+    if (options.type === "function") {
+        icon = `<svg xmlns="http://www.w3.org/2000/svg" 
+            width="24" 
+            height="24" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            stroke-width="2" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            class="feather feather-box"
+            style="width: 1rem; height: 1rem; margin-top: 0.05rem;"
+        >
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line>
+        </svg>` 
+    }
 
     // add a description
     if (options.description) {
@@ -61,6 +78,16 @@ function createItem(options: { name?: string, keyword: string, type: string, des
     } else {
         descriptionField.style.display = 'none'
     }
+
+    list.innerHTML += `<li data-keyword="${options.keyword.replace("&lt;", "<").replace("&gt;", ">")}" data-type="${options.type}" 
+    class="${_options.class}-list-item" data-description="${options.description || ""}" data-is-partial="${options.isPartial ? "true" : "false"}" 
+    data-name="${options.name || options.keyword}">
+        <span class="codejar-keyword-container" style="display: flex;">
+            <span class="codejar-keyword-icon">${icon}</span>
+            <span class="codejar-keyword">${options.name || options.keyword}</span>
+            <span class="codejar-keyword-type">[${options.type}]</span>
+        </span>
+    </li>`
 }
 
 /**
@@ -168,7 +195,7 @@ export function init(options: Partial<Options> = {}) {
                 padding: 0.5rem 0;\ngap: 0.2rem;
             }
             .${_options.class} .${_options.class}-list-item {
-                display: block;\npadding: ${_options.itemPadding};\nborder-radius: 4px;
+                display: flex;\npadding: ${_options.itemPadding};\nborder-radius: 4px;
                 transition: all 0.08s ease-in-out;\noutline: 1px solid transparent;
                 cursor: pointer;\nwidth: 95%;\nmargin: 0 auto; color: rgb(${textColor}, ${textColor}, ${textColor})
             }
@@ -176,9 +203,14 @@ export function init(options: Partial<Options> = {}) {
                 background-color: ${_options.backgroundDarker};
                 outline: 1px solid rgb(${borderColor}, ${borderColor}, ${borderColor});
             }
+            .${_options.class} .${_options.class}-list-item span.codejar-keyword {
+                margin-left: 12px;
+                margin-bottom: 0.2rem;
+            }
 
             .codejar-keyword-type {\nopacity: 0.25;\nmargin-left: 1.2rem;\n
             .codejar-keyword {\nopactiy: 0.5;\n}
+            .codejar-keyword-container {\ndisplay: flex;\n}
 
             .${_options.class}-description {\n/opacity: 0.5;\nbackground-color: ${_options.backgroundDarker};\n}
         `)
@@ -261,7 +293,7 @@ const submitItem = (e: KeyboardEvent) => {
     if (currentItem) {
         if (!CodeJarWindow.setContent || !CodeJarWindow.saveCursor || !CodeJarWindow.restoreCursor) return
         e.preventDefault()
-        const position = CodeJarWindow.saveCursor()
+        let position: any = CodeJarWindow.saveCursor()
 
         let keyword = currentItem.getAttribute('data-keyword')
         const type = currentItem.getAttribute('data-type')
@@ -318,6 +350,8 @@ const submitItem = (e: KeyboardEvent) => {
         CodeJarWindow.restoreCursor(position)
 
         // reset currentItem
+        currentItem = null
+        position = null
         hideModal()
     }
 }
@@ -471,12 +505,16 @@ export function autoCompleteText(options?: Partial<Options>) {
 /**
  * Remove the autocomplete dialog and its options
  */
-export function destroy() {
+export function destroy(options?: any) {
     if (!modal) return
     document.getElementById("codejar-autocomlete-styles")?.remove()
 
-    for (let element of document.getElementsByClassName("codejar-autocomplete") as any) {
+    for (let element of document.getElementsByClassName("codejar-autocomplete") as any) {        
         element.remove()
+    }
+
+    if (options) { // automatically restart
+        [modal, list, descriptionField] = init(options)
     }
 }
 

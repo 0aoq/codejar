@@ -37,6 +37,8 @@
             overflow: auto;
         }
     </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
 </head>
 <body>
 <main>
@@ -89,6 +91,12 @@
   document.getElementById("setLanguage").addEventListener("click", () => {
     jar.setLanguage(prompt("Language Name: (example: \"javascript\")"))
   })
+
+  if (feather) {
+    setInterval(() => {
+      feather.replace({ style: 'width: 12px; height: 12px; margin-top: 0.25rem;' })
+    }, 1);
+  }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js"></script>
 </body>
