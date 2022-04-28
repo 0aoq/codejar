@@ -25,7 +25,8 @@ interface CodeJarWindow extends Window {
   saveCursor?: () => Position,
   restoreCursor?: (pos: Position) => void,
   languages?: any,
-  themes?: any
+  themes?: any,
+  language?: string
 }
 
 interface LanguageOptions {
@@ -44,6 +45,7 @@ let autoCompleteOptions: any = {}
 export const CodeJarWindow = window as CodeJarWindow
 CodeJarWindow.languages = [] as LanguageOptions[]
 CodeJarWindow.themes = {} as any
+CodeJarWindow.language = "javascript"
 
 export type Position = {
   start: number
@@ -572,6 +574,10 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
     addLanguage(name: string, options: LanguageOptions) {
       CodeJarWindow.languages[name] = options
     },
+    setLanguage(language: string) {
+      CodeJarWindow.language = language
+      autocomplete.setLanguage(language)
+    },
 
     addTheme(_module: any) {
       if (!_module.import || !_module.editor || !CodeJarWindow.themes) return
@@ -603,12 +609,15 @@ export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: P
       // set autocomplete options
       autoCompleteOptions["altbackground"] = theme.editor["editor.autocomplete.background"]
 
+      // init autocomplete
+      autocomplete.init(autoCompleteOptions)
+
       // line numbers
       const lineNumbers = document.getElementsByClassName("codejar-linenumbers")[0] as HTMLElement
-      let textColor = (theme.editor["editor.autocomplete.background"] < 127.5) as any
+      let textColor = (theme.editor["editor.autocomplete.background"] > 127.5) as any
 
-      if (textColor) textColor = "#FFF"
-      else textColor = "#000"
+      if (textColor === true) textColor = "#FFF"
+      else textColor = "#000 !important"
 
       if (!lineNumbers) return
       lineNumbers.style.color = textColor as string

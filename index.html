@@ -41,6 +41,8 @@
 <body>
 <main>
     <div class="editor language-js"></div>
+    <a href="#" id="setTheme">Change Theme</a>
+    <a href="#" id="setLanguage">Change Language</a>
 </main>
 <script type="module">
   import {CodeJar} from './codejar.js'
@@ -48,8 +50,8 @@
   import * as JavaScriptData from './languages/javascript/javascript.js'
   import * as HTMLData from './languages/html/html.js'
 
-  import * as agate from './themes/agate.js'
-  import * as github from './themes/github.js'
+  import * as agate from './themes/agate/agate.js'
+  import * as github from './themes/github/github.js'
 
   import {withLineNumbers} from './linenumbers.js'
 
@@ -59,7 +61,7 @@
     // highlight.js does not trim old tags,
     // let's do it by this hack.
     editor.textContent = editor.textContent
-    hljs.highlightBlock(editor)
+    hljs.highlightElement(editor)
   }
 
   const jar = CodeJar(editor, withLineNumbers(highlight))
@@ -73,9 +75,21 @@
   jar.addLanguage('html', HTMLData)
 
   jar.addTheme(agate.default)
-  jar.addTheme(github.default)
-  jar.setTheme('agate')
+
+  jar.addTheme(github.github_light)
+  jar.addTheme(github.github_dark)
+  jar.addTheme(github.github_dark_dimmed)
+
+  jar.setTheme('github_light')
+
+  document.getElementById("setTheme").addEventListener("click", () => {
+    jar.setTheme(prompt("Theme Name: (example: \"github_light\")"))
+  })
+
+  document.getElementById("setLanguage").addEventListener("click", () => {
+    jar.setLanguage(prompt("Language Name: (example: \"javascript\")"))
+  })
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js"></script>
 </body>
 </html>

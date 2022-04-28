@@ -22,7 +22,7 @@ let currentLanguageData: any = []
  * Set the current language
  * @param {string} language
  */
-function setLanguage(language: string) {
+export function setLanguage(language: string) {
     if (!CodeJarWindow.languages) return
     currentLanguageData = CodeJarWindow.languages[language].default
 }
@@ -52,7 +52,7 @@ function createItem(options: { name?: string, keyword: string, type: string, des
     _item.setAttribute("data-is-partial", options.isPartial ? "true" : "false")
     _item.setAttribute("data-name", options.name || options.keyword)
 
-    list.appendChild(_item)
+    for (let i = 0; i < 5; i++) list.appendChild(_item)
 
     // add a description
     if (options.description) {
@@ -102,8 +102,7 @@ function matchAutocomplete(input: string, list: HTMLElement) {
     })
 
     if (matches.length === 0) {
-        modal.style.display = 'none'
-        modalVisible = false
+        hideModal()
         return
     }
 
@@ -474,8 +473,11 @@ export function autoCompleteText(options?: Partial<Options>) {
  */
 export function destroy() {
     if (!modal) return
-    modal.remove()
     document.getElementById("codejar-autocomlete-styles")?.remove()
+
+    for (let element of document.getElementsByClassName("codejar-autocomplete") as any) {
+        element.remove()
+    }
 }
 
 setTimeout(() => {
