@@ -3,41 +3,41 @@ import * as autocomplete from "./autocomplete/autocomplete.js"
 const globalWindow = window
 
 type Options = {
-  tab: string
-  indentOn: RegExp
-  moveToNewLine: RegExp
-  spellcheck: boolean
-  catchTab: boolean
-  preserveIdent: boolean
-  addClosing: boolean
-  history: boolean
-  window: typeof window
+    tab: string
+    indentOn: RegExp
+    moveToNewLine: RegExp
+    spellcheck: boolean
+    catchTab: boolean
+    preserveIdent: boolean
+    addClosing: boolean
+    history: boolean
+    window: typeof window
 }
 
 type HistoryRecord = {
-  html: string
-  pos: Position
+    html: string
+    pos: Position
 }
 
 interface CodeJarWindow extends Window {
-  CodeJar?: HTMLElement,
-  setContent?: (html: string) => void,
-  saveCursor?: () => Position,
-  restoreCursor?: (pos: Position) => void,
-  languages?: any,
-  themes?: any,
-  language?: string
+    CodeJar?: HTMLElement,
+    setContent?: (html: string) => void,
+    saveCursor?: () => Position,
+    restoreCursor?: (pos: Position) => void,
+    languages?: any,
+    themes?: any,
+    language?: string
 }
 
 interface LanguageOptions {
-  language: {
-    name: string,
-    extensions: string[],
-  },
+    language: {
+        name: string,
+        extensions: string[],
+    },
 
-  keywords: {
-    [key: string]: string[]
-  }
+    keywords: {
+        [key: string]: string[]
+    }
 }
 
 let autoCompleteOptions: any = {}
@@ -48,586 +48,586 @@ CodeJarWindow.themes = {} as any
 CodeJarWindow.language = "javascript"
 
 export type Position = {
-  start: number
-  end: number
-  dir?: '->' | '<-'
+    start: number
+    end: number
+    dir?: '->' | '<-'
 }
 
 export type CodeJar = ReturnType<typeof CodeJar>
 
 export function CodeJar(editor: HTMLElement, highlight: (e: HTMLElement, pos?: Position) => void, opt: Partial<Options> = {}) {
-  const options: Options = {
-    tab: '\t',
-    indentOn: /[({\[]$/,
-    moveToNewLine: /^[)}\]]/,
-    spellcheck: false,
-    catchTab: true,
-    preserveIdent: true,
-    addClosing: true,
-    history: true,
-    window: globalWindow,
-    ...opt
-  }
-
-  const window = options.window
-  const document = window.document
-
-  let listeners: [string, any][] = []
-  let history: HistoryRecord[] = []
-  let at = -1
-  let focus = false
-  let callback: (code: string) => void | undefined
-  let prev: string // code content prior keydown event
-
-  editor.setAttribute('contenteditable', 'plaintext-only')
-  editor.setAttribute('spellcheck', options.spellcheck ? 'true' : 'false')
-  editor.style.outline = 'none'
-  editor.style.overflowWrap = 'break-word'
-  editor.style.overflowY = 'auto'
-  editor.style.whiteSpace = 'pre-wrap'
-  editor.classList.add('codejar-editor')
-  if (!editor.id) editor.id = 'codejar-editor-' + document.querySelectorAll('.codejar-editor').length
-
-  CodeJarWindow.CodeJar = editor
-
-  let isLegacy = false // true if plaintext-only is not supported
-
-  highlight(editor)
-  if (editor.contentEditable !== 'plaintext-only') isLegacy = true
-  if (isLegacy) editor.setAttribute('contenteditable', 'true')
-
-  const debounceHighlight = debounce(() => {
-    const pos = save()
-    highlight(editor, pos)
-    restore(pos)
-  }, 30)
-
-  let recording = false
-  const shouldRecord = (event: KeyboardEvent): boolean => {
-    return !isUndo(event) && !isRedo(event)
-      && event.key !== 'Meta'
-      && event.key !== 'Control'
-      && event.key !== 'Alt'
-      && !event.key.startsWith('Arrow')
-  }
-  const debounceRecordHistory = debounce((event: KeyboardEvent) => {
-    if (shouldRecord(event)) {
-      recordHistory()
-      recording = false
-    }
-  }, 300)
-
-  const on = <K extends keyof HTMLElementEventMap>(type: K, fn: (event: HTMLElementEventMap[K]) => void) => {
-    listeners.push([type, fn])
-    editor.addEventListener(type, fn)
-  }
-
-  on('keydown', event => {
-    if (event.defaultPrevented) return
-    autocomplete.autoCompleteText(autoCompleteOptions)
-
-    prev = toString()
-    if (options.preserveIdent) handleNewLine(event)
-    else legacyNewLineFix(event)
-    if (options.catchTab) handleTabCharacters(event)
-    if (options.addClosing) handleSelfClosingCharacters(event)
-    if (options.history) {
-      handleUndoRedo(event)
-      if (shouldRecord(event) && !recording) {
-        recordHistory()
-        recording = true
-      }
+    const options: Options = {
+        tab: '\t',
+        indentOn: /[({\[]$/,
+        moveToNewLine: /^[)}\]]/,
+        spellcheck: false,
+        catchTab: true,
+        preserveIdent: true,
+        addClosing: true,
+        history: true,
+        window: globalWindow,
+        ...opt
     }
 
-    if (isLegacy) restore(save())
-  })
+    const window = options.window
+    const document = window.document
 
-  on('keyup', event => {
-    if (event.defaultPrevented) return
-    if (event.isComposing) return
+    let listeners: [string, any][] = []
+    let history: HistoryRecord[] = []
+    let at = -1
+    let focus = false
+    let callback: (code: string) => void | undefined
+    let prev: string // code content prior keydown event
 
-    if (prev !== toString()) debounceHighlight()
-    debounceRecordHistory(event)
-    if (callback) callback(toString())
-  })
+    editor.setAttribute('contenteditable', 'plaintext-only')
+    editor.setAttribute('spellcheck', options.spellcheck ? 'true' : 'false')
+    editor.style.outline = 'none'
+    editor.style.overflowWrap = 'break-word'
+    editor.style.overflowY = 'auto'
+    editor.style.whiteSpace = 'pre-wrap'
+    editor.classList.add('codejar-editor')
+    if (!editor.id) editor.id = 'codejar-editor-' + document.querySelectorAll('.codejar-editor').length
 
-  // handle possibleClearState
-  let possibleClearState = false
-  let removeClearStateOn = ['ArrowLeft', 'ArrowRight']
-  on('mousedown', event => {
-    possibleClearState = false
-  })
-
-  on('keydown', event => {
-    if (event.key === 'a' && event.ctrlKey && !possibleClearState) {
-      possibleClearState = true
-      return
-    }
-
-    if (event.key !== 'Backspace' && event.key === 'a' && !event.ctrlKey && possibleClearState || removeClearStateOn.includes(event.key)) {
-      possibleClearState = false
-    }
-
-    if (event.key !== 'Backspace') return
-    if (possibleClearState) {
-      event.preventDefault()
-      editor.innerHTML = ""
-      possibleClearState = false
-    }
-  })
-
-  on('focus', _event => {
-    focus = true
     CodeJarWindow.CodeJar = editor
-  })
 
-  on('blur', _event => {
-    focus = false
-  })
+    let isLegacy = false // true if plaintext-only is not supported
 
-  on('paste', event => {
-    recordHistory()
-    handlePaste(event)
-    recordHistory()
-    if (callback) callback(toString())
-  })
+    highlight(editor)
+    if (editor.contentEditable !== 'plaintext-only') isLegacy = true
+    if (isLegacy) editor.setAttribute('contenteditable', 'true')
 
-  function save(): Position {
-    const s = getSelection()
-    const pos: Position = { start: 0, end: 0, dir: undefined }
+    const debounceHighlight = debounce(() => {
+        const pos = save()
+        highlight(editor, pos)
+        restore(pos)
+    }, 30)
 
-    let { anchorNode, anchorOffset, focusNode, focusOffset } = s
-    if (!anchorNode || !focusNode) throw 'error1'
-
-    // Selection anchor and focus are expected to be text nodes,
-    // so normalize them.
-    if (anchorNode.nodeType === Node.ELEMENT_NODE) {
-      const node = document.createTextNode('')
-      anchorNode.insertBefore(node, anchorNode.childNodes[anchorOffset])
-      anchorNode = node
-      anchorOffset = 0
+    let recording = false
+    const shouldRecord = (event: KeyboardEvent): boolean => {
+        return !isUndo(event) && !isRedo(event)
+            && event.key !== 'Meta'
+            && event.key !== 'Control'
+            && event.key !== 'Alt'
+            && !event.key.startsWith('Arrow')
     }
-    if (focusNode.nodeType === Node.ELEMENT_NODE) {
-      const node = document.createTextNode('')
-      focusNode.insertBefore(node, focusNode.childNodes[focusOffset])
-      focusNode = node
-      focusOffset = 0
+    const debounceRecordHistory = debounce((event: KeyboardEvent) => {
+        if (shouldRecord(event)) {
+            recordHistory()
+            recording = false
+        }
+    }, 300)
+
+    const on = <K extends keyof HTMLElementEventMap>(type: K, fn: (event: HTMLElementEventMap[K]) => void) => {
+        listeners.push([type, fn])
+        editor.addEventListener(type, fn)
     }
 
-    visit(editor, el => {
-      if (el === anchorNode && el === focusNode) {
-        pos.start += anchorOffset
-        pos.end += focusOffset
-        pos.dir = anchorOffset <= focusOffset ? '->' : '<-'
-        return 'stop'
-      }
+    on('keydown', event => {
+        if (event.defaultPrevented) return
+        autocomplete.autoCompleteText(autoCompleteOptions)
 
-      if (el === anchorNode) {
-        pos.start += anchorOffset
-        if (!pos.dir) {
-          pos.dir = '->'
-        } else {
-          return 'stop'
+        prev = toString()
+        if (options.preserveIdent) handleNewLine(event)
+        else legacyNewLineFix(event)
+        if (options.catchTab) handleTabCharacters(event)
+        if (options.addClosing) handleSelfClosingCharacters(event)
+        if (options.history) {
+            handleUndoRedo(event)
+            if (shouldRecord(event) && !recording) {
+                recordHistory()
+                recording = true
+            }
         }
-      } else if (el === focusNode) {
-        pos.end += focusOffset
-        if (!pos.dir) {
-          pos.dir = '<-'
-        } else {
-          return 'stop'
-        }
-      }
 
-      if (el.nodeType === Node.TEXT_NODE) {
-        if (pos.dir != '->') pos.start += el.nodeValue!.length
-        if (pos.dir != '<-') pos.end += el.nodeValue!.length
-      }
+        if (isLegacy) restore(save())
     })
 
-    // collapse empty text nodes
-    editor.normalize()
+    on('keyup', event => {
+        if (event.defaultPrevented) return
+        if (event.isComposing) return
 
-    return pos
-  }
-
-  function restore(pos: Position) {
-    const s = getSelection()
-    let startNode: Node | undefined, startOffset = 0
-    let endNode: Node | undefined, endOffset = 0
-
-    if (!pos.dir) pos.dir = '->'
-    if (pos.start < 0) pos.start = 0
-    if (pos.end < 0) pos.end = 0
-
-    // Flip start and end if the direction reversed
-    if (pos.dir == '<-') {
-      const { start, end } = pos
-      pos.start = end
-      pos.end = start
-    }
-
-    let current = 0
-
-    visit(editor, el => {
-      if (el.nodeType !== Node.TEXT_NODE) return
-
-      const len = (el.nodeValue || '').length
-      if (current + len > pos.start) {
-        if (!startNode) {
-          startNode = el
-          startOffset = pos.start - current
-        }
-        if (current + len > pos.end) {
-          endNode = el
-          endOffset = pos.end - current
-          return 'stop'
-        }
-      }
-      current += len
+        if (prev !== toString()) debounceHighlight()
+        debounceRecordHistory(event)
+        if (callback) callback(toString())
     })
 
-    if (!startNode) startNode = editor, startOffset = editor.childNodes.length
-    if (!endNode) endNode = editor, endOffset = editor.childNodes.length
+    // handle possibleClearState
+    let possibleClearState = false
+    let removeClearStateOn = ['ArrowLeft', 'ArrowRight']
+    on('mousedown', event => {
+        possibleClearState = false
+    })
 
-    // Flip back the selection
-    if (pos.dir == '<-') {
-      [startNode, startOffset, endNode, endOffset] = [endNode, endOffset, startNode, startOffset]
+    on('keydown', event => {
+        if (event.key === 'a' && event.ctrlKey && !possibleClearState) {
+            possibleClearState = true
+            return
+        }
+
+        if (event.key !== 'Backspace' && event.key === 'a' && !event.ctrlKey && possibleClearState || removeClearStateOn.includes(event.key)) {
+            possibleClearState = false
+        }
+
+        if (event.key !== 'Backspace') return
+        if (possibleClearState) {
+            event.preventDefault()
+            editor.innerHTML = ""
+            possibleClearState = false
+        }
+    })
+
+    on('focus', _event => {
+        focus = true
+        CodeJarWindow.CodeJar = editor
+    })
+
+    on('blur', _event => {
+        focus = false
+    })
+
+    on('paste', event => {
+        recordHistory()
+        handlePaste(event)
+        recordHistory()
+        if (callback) callback(toString())
+    })
+
+    function save(): Position {
+        const s = getSelection()
+        const pos: Position = { start: 0, end: 0, dir: undefined }
+
+        let { anchorNode, anchorOffset, focusNode, focusOffset } = s
+        if (!anchorNode || !focusNode) throw 'error1'
+
+        // Selection anchor and focus are expected to be text nodes,
+        // so normalize them.
+        if (anchorNode.nodeType === Node.ELEMENT_NODE) {
+            const node = document.createTextNode('')
+            anchorNode.insertBefore(node, anchorNode.childNodes[anchorOffset])
+            anchorNode = node
+            anchorOffset = 0
+        }
+        if (focusNode.nodeType === Node.ELEMENT_NODE) {
+            const node = document.createTextNode('')
+            focusNode.insertBefore(node, focusNode.childNodes[focusOffset])
+            focusNode = node
+            focusOffset = 0
+        }
+
+        visit(editor, el => {
+            if (el === anchorNode && el === focusNode) {
+                pos.start += anchorOffset
+                pos.end += focusOffset
+                pos.dir = anchorOffset <= focusOffset ? '->' : '<-'
+                return 'stop'
+            }
+
+            if (el === anchorNode) {
+                pos.start += anchorOffset
+                if (!pos.dir) {
+                    pos.dir = '->'
+                } else {
+                    return 'stop'
+                }
+            } else if (el === focusNode) {
+                pos.end += focusOffset
+                if (!pos.dir) {
+                    pos.dir = '<-'
+                } else {
+                    return 'stop'
+                }
+            }
+
+            if (el.nodeType === Node.TEXT_NODE) {
+                if (pos.dir != '->') pos.start += el.nodeValue!.length
+                if (pos.dir != '<-') pos.end += el.nodeValue!.length
+            }
+        })
+
+        // collapse empty text nodes
+        editor.normalize()
+
+        return pos
     }
 
-    s.setBaseAndExtent(startNode, startOffset, endNode, endOffset)
-  }
+    function restore(pos: Position) {
+        const s = getSelection()
+        let startNode: Node | undefined, startOffset = 0
+        let endNode: Node | undefined, endOffset = 0
 
-  function beforeCursor() {
-    const s = getSelection()
-    const r0 = s.getRangeAt(0)
-    const r = document.createRange()
-    r.selectNodeContents(editor)
-    r.setEnd(r0.startContainer, r0.startOffset)
-    return r.toString()
-  }
+        if (!pos.dir) pos.dir = '->'
+        if (pos.start < 0) pos.start = 0
+        if (pos.end < 0) pos.end = 0
 
-  function afterCursor() {
-    const s = getSelection()
-    const r0 = s.getRangeAt(0)
-    const r = document.createRange()
-    r.selectNodeContents(editor)
-    r.setStart(r0.endContainer, r0.endOffset)
-    return r.toString()
-  }
+        // Flip start and end if the direction reversed
+        if (pos.dir == '<-') {
+            const { start, end } = pos
+            pos.start = end
+            pos.end = start
+        }
 
-  function handleNewLine(event: KeyboardEvent) {
-    if (event.key === 'Enter') {
-      const before = beforeCursor()
-      const after = afterCursor()
+        let current = 0
 
-      let [padding] = findPadding(before)
-      let newLinePadding = padding
+        visit(editor, el => {
+            if (el.nodeType !== Node.TEXT_NODE) return
 
-      // If last symbol is "{" ident new line
-      if (options.indentOn.test(before)) {
-        newLinePadding += options.tab
-      }
+            const len = (el.nodeValue || '').length
+            if (current + len > pos.start) {
+                if (!startNode) {
+                    startNode = el
+                    startOffset = pos.start - current
+                }
+                if (current + len > pos.end) {
+                    endNode = el
+                    endOffset = pos.end - current
+                    return 'stop'
+                }
+            }
+            current += len
+        })
 
-      // Preserve padding
-      if (newLinePadding.length > 0) {
+        if (!startNode) startNode = editor, startOffset = editor.childNodes.length
+        if (!endNode) endNode = editor, endOffset = editor.childNodes.length
+
+        // Flip back the selection
+        if (pos.dir == '<-') {
+            [startNode, startOffset, endNode, endOffset] = [endNode, endOffset, startNode, startOffset]
+        }
+
+        s.setBaseAndExtent(startNode, startOffset, endNode, endOffset)
+    }
+
+    function beforeCursor() {
+        const s = getSelection()
+        const r0 = s.getRangeAt(0)
+        const r = document.createRange()
+        r.selectNodeContents(editor)
+        r.setEnd(r0.startContainer, r0.startOffset)
+        return r.toString()
+    }
+
+    function afterCursor() {
+        const s = getSelection()
+        const r0 = s.getRangeAt(0)
+        const r = document.createRange()
+        r.selectNodeContents(editor)
+        r.setStart(r0.endContainer, r0.endOffset)
+        return r.toString()
+    }
+
+    function handleNewLine(event: KeyboardEvent) {
+        if (event.key === 'Enter') {
+            const before = beforeCursor()
+            const after = afterCursor()
+
+            let [padding] = findPadding(before)
+            let newLinePadding = padding
+
+            // If last symbol is "{" ident new line
+            if (options.indentOn.test(before)) {
+                newLinePadding += options.tab
+            }
+
+            // Preserve padding
+            if (newLinePadding.length > 0) {
+                preventDefault(event)
+                event.stopPropagation()
+                insert('\n' + newLinePadding)
+            } else {
+                legacyNewLineFix(event)
+            }
+
+            // Place adjacent "}" on next line
+            if (newLinePadding !== padding && options.moveToNewLine.test(after)) {
+                const pos = save()
+                insert('\n' + padding)
+                restore(pos)
+            }
+        }
+    }
+
+    function legacyNewLineFix(event: KeyboardEvent) {
+        // Firefox does not support plaintext-only mode
+        // and puts <div><br></div> on Enter. Let's help.
+        if (isLegacy && event.key === 'Enter') {
+            preventDefault(event)
+            event.stopPropagation()
+            if (afterCursor() == '') {
+                insert('\n ')
+                const pos = save()
+                pos.start = --pos.end
+                restore(pos)
+            } else {
+                insert('\n')
+            }
+        }
+    }
+
+    function handleSelfClosingCharacters(event: KeyboardEvent) {
+        const open = `([{'"`
+        const close = `)]}'"`
+        const codeAfter = afterCursor()
+        const codeBefore = beforeCursor()
+        const escapeCharacter = codeBefore.substr(codeBefore.length - 1) === '\\'
+        const charAfter = codeAfter.substr(0, 1)
+        if (close.includes(event.key) && !escapeCharacter && charAfter === event.key) {
+            // We already have closing char next to cursor.
+            // Move one char to right.
+            const pos = save()
+            preventDefault(event)
+            pos.start = ++pos.end
+            restore(pos)
+        } else if (
+            open.includes(event.key)
+            && !escapeCharacter
+            && (`"'`.includes(event.key) || ['', ' ', '\n'].includes(charAfter))
+        ) {
+            preventDefault(event)
+            const pos = save()
+            const wrapText = pos.start == pos.end ? '' : getSelection().toString()
+            const text = event.key + wrapText + close[open.indexOf(event.key)]
+            insert(text)
+            pos.start++
+            pos.end++
+            restore(pos)
+        }
+    }
+
+    function handleTabCharacters(event: KeyboardEvent) {
+        if (event.key === 'Tab') {
+            preventDefault(event)
+            if (event.shiftKey) {
+                const before = beforeCursor()
+                let [padding, start,] = findPadding(before)
+                if (padding.length > 0) {
+                    const pos = save()
+                    // Remove full length tab or just remaining padding
+                    const len = Math.min(options.tab.length, padding.length)
+                    restore({ start, end: start + len })
+                    document.execCommand('delete')
+                    pos.start -= len
+                    pos.end -= len
+                    restore(pos)
+                }
+            } else {
+                insert(options.tab)
+            }
+        }
+    }
+
+    function handleUndoRedo(event: KeyboardEvent) {
+        if (isUndo(event)) {
+            preventDefault(event)
+            at--
+            const record = history[at]
+            if (record) {
+                editor.innerHTML = record.html
+                restore(record.pos)
+            }
+            if (at < 0) at = 0
+        }
+        if (isRedo(event)) {
+            preventDefault(event)
+            at++
+            const record = history[at]
+            if (record) {
+                editor.innerHTML = record.html
+                restore(record.pos)
+            }
+            if (at >= history.length) at--
+        }
+    }
+
+    function recordHistory() {
+        if (!focus) return
+
+        const html = editor.innerHTML
+        const pos = save()
+
+        const lastRecord = history[at]
+        if (lastRecord) {
+            if (lastRecord.html === html
+                && lastRecord.pos.start === pos.start
+                && lastRecord.pos.end === pos.end) return
+        }
+
+        at++
+        history[at] = { html, pos }
+        history.splice(at + 1)
+
+        const maxHistory = 300
+        if (at > maxHistory) {
+            at = maxHistory
+            history.splice(0, 1)
+        }
+    }
+
+    function handlePaste(event: ClipboardEvent) {
         preventDefault(event)
-        event.stopPropagation()
-        insert('\n' + newLinePadding)
-      } else {
-        legacyNewLineFix(event)
-      }
-
-      // Place adjacent "}" on next line
-      if (newLinePadding !== padding && options.moveToNewLine.test(after)) {
+        const text = ((event as any).originalEvent || event)
+            .clipboardData
+            .getData('text/plain')
+            .replace(/\r/g, '')
         const pos = save()
-        insert('\n' + padding)
-        restore(pos)
-      }
+        insert(text)
+        highlight(editor)
+        restore({
+            start: Math.min(pos.start, pos.end) + text.length,
+            end: Math.min(pos.start, pos.end) + text.length,
+            dir: '<-',
+        })
     }
-  }
 
-  function legacyNewLineFix(event: KeyboardEvent) {
-    // Firefox does not support plaintext-only mode
-    // and puts <div><br></div> on Enter. Let's help.
-    if (isLegacy && event.key === 'Enter') {
-      preventDefault(event)
-      event.stopPropagation()
-      if (afterCursor() == '') {
-        insert('\n ')
-        const pos = save()
-        pos.start = --pos.end
-        restore(pos)
-      } else {
-        insert('\n')
-      }
-    }
-  }
 
-  function handleSelfClosingCharacters(event: KeyboardEvent) {
-    const open = `([{'"`
-    const close = `)]}'"`
-    const codeAfter = afterCursor()
-    const codeBefore = beforeCursor()
-    const escapeCharacter = codeBefore.substr(codeBefore.length - 1) === '\\'
-    const charAfter = codeAfter.substr(0, 1)
-    if (close.includes(event.key) && !escapeCharacter && charAfter === event.key) {
-      // We already have closing char next to cursor.
-      // Move one char to right.
-      const pos = save()
-      preventDefault(event)
-      pos.start = ++pos.end
-      restore(pos)
-    } else if (
-      open.includes(event.key)
-      && !escapeCharacter
-      && (`"'`.includes(event.key) || ['', ' ', '\n'].includes(charAfter))
-    ) {
-      preventDefault(event)
-      const pos = save()
-      const wrapText = pos.start == pos.end ? '' : getSelection().toString()
-      const text = event.key + wrapText + close[open.indexOf(event.key)]
-      insert(text)
-      pos.start++
-      pos.end++
-      restore(pos)
-    }
-  }
+    function visit(editor: HTMLElement, visitor: (el: Node) => 'stop' | undefined) {
+        const queue: Node[] = []
 
-  function handleTabCharacters(event: KeyboardEvent) {
-    if (event.key === 'Tab') {
-      preventDefault(event)
-      if (event.shiftKey) {
-        const before = beforeCursor()
-        let [padding, start,] = findPadding(before)
-        if (padding.length > 0) {
-          const pos = save()
-          // Remove full length tab or just remaining padding
-          const len = Math.min(options.tab.length, padding.length)
-          restore({ start, end: start + len })
-          document.execCommand('delete')
-          pos.start -= len
-          pos.end -= len
-          restore(pos)
+        if (editor.firstChild) queue.push(editor.firstChild)
+
+        let el = queue.pop()
+
+        while (el) {
+            if (visitor(el) === 'stop')
+                break
+
+            if (el.nextSibling) queue.push(el.nextSibling)
+            if (el.firstChild) queue.push(el.firstChild)
+
+            el = queue.pop()
         }
-      } else {
-        insert(options.tab)
-      }
-    }
-  }
-
-  function handleUndoRedo(event: KeyboardEvent) {
-    if (isUndo(event)) {
-      preventDefault(event)
-      at--
-      const record = history[at]
-      if (record) {
-        editor.innerHTML = record.html
-        restore(record.pos)
-      }
-      if (at < 0) at = 0
-    }
-    if (isRedo(event)) {
-      preventDefault(event)
-      at++
-      const record = history[at]
-      if (record) {
-        editor.innerHTML = record.html
-        restore(record.pos)
-      }
-      if (at >= history.length) at--
-    }
-  }
-
-  function recordHistory() {
-    if (!focus) return
-
-    const html = editor.innerHTML
-    const pos = save()
-
-    const lastRecord = history[at]
-    if (lastRecord) {
-      if (lastRecord.html === html
-        && lastRecord.pos.start === pos.start
-        && lastRecord.pos.end === pos.end) return
     }
 
-    at++
-    history[at] = { html, pos }
-    history.splice(at + 1)
-
-    const maxHistory = 300
-    if (at > maxHistory) {
-      at = maxHistory
-      history.splice(0, 1)
+    function isCtrl(event: KeyboardEvent) {
+        return event.metaKey || event.ctrlKey
     }
-  }
 
-  function handlePaste(event: ClipboardEvent) {
-    preventDefault(event)
-    const text = ((event as any).originalEvent || event)
-      .clipboardData
-      .getData('text/plain')
-      .replace(/\r/g, '')
-    const pos = save()
-    insert(text)
-    highlight(editor)
-    restore({
-      start: Math.min(pos.start, pos.end) + text.length,
-      end: Math.min(pos.start, pos.end) + text.length,
-      dir: '<-',
-    })
-  }
-
-
-  function visit(editor: HTMLElement, visitor: (el: Node) => 'stop' | undefined) {
-    const queue: Node[] = []
-
-    if (editor.firstChild) queue.push(editor.firstChild)
-
-    let el = queue.pop()
-
-    while (el) {
-      if (visitor(el) === 'stop')
-        break
-
-      if (el.nextSibling) queue.push(el.nextSibling)
-      if (el.firstChild) queue.push(el.firstChild)
-
-      el = queue.pop()
+    function isUndo(event: KeyboardEvent) {
+        return isCtrl(event) && !event.shiftKey && event.code === 'KeyZ'
     }
-  }
 
-  function isCtrl(event: KeyboardEvent) {
-    return event.metaKey || event.ctrlKey
-  }
-
-  function isUndo(event: KeyboardEvent) {
-    return isCtrl(event) && !event.shiftKey && event.code === 'KeyZ'
-  }
-
-  function isRedo(event: KeyboardEvent) {
-    return isCtrl(event) && event.shiftKey && event.code === 'KeyZ'
-  }
-
-  function insert(text: string) {
-    text = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;')
-    document.execCommand('insertHTML', false, text)
-  }
-
-  function debounce(cb: any, wait: number) {
-    let timeout = 0
-    return (...args: any) => {
-      clearTimeout(timeout)
-      timeout = window.setTimeout(() => cb(...args), wait)
+    function isRedo(event: KeyboardEvent) {
+        return isCtrl(event) && event.shiftKey && event.code === 'KeyZ'
     }
-  }
 
-  function findPadding(text: string): [string, number, number] {
-    // Find beginning of previous line.
-    let i = text.length - 1
-    while (i >= 0 && text[i] !== '\n') i--
-    i++
-    // Find padding of the line.
-    let j = i
-    while (j < text.length && /[ \t]/.test(text[j])) j++
-    return [text.substring(i, j) || '', i, j]
-  }
-
-  function toString() {
-    return editor.textContent || ''
-  }
-
-  function preventDefault(event: Event) {
-    event.preventDefault()
-  }
-
-  function getSelection() {
-    if (editor.parentNode?.nodeType == Node.DOCUMENT_FRAGMENT_NODE) {
-      return (editor.parentNode as Document).getSelection()!
+    function insert(text: string) {
+        text = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+        document.execCommand('insertHTML', false, text)
     }
-    return window.getSelection()!
-  }
 
-  function updateCode(code: string) {
-    editor.textContent = code
-    highlight(editor)
-  }
+    function debounce(cb: any, wait: number) {
+        let timeout = 0
+        return (...args: any) => {
+            clearTimeout(timeout)
+            timeout = window.setTimeout(() => cb(...args), wait)
+        }
+    }
 
-  CodeJarWindow.setContent = updateCode
-  CodeJarWindow.saveCursor = save
-  CodeJarWindow.restoreCursor = restore
+    function findPadding(text: string): [string, number, number] {
+        // Find beginning of previous line.
+        let i = text.length - 1
+        while (i >= 0 && text[i] !== '\n') i--
+        i++
+        // Find padding of the line.
+        let j = i
+        while (j < text.length && /[ \t]/.test(text[j])) j++
+        return [text.substring(i, j) || '', i, j]
+    }
 
-  return {
-    updateOptions(newOptions: Partial<Options>) {
-      Object.assign(options, newOptions)
-    },
-    updateCode,
-    onUpdate(cb: (code: string) => void) {
-      callback = cb
-    },
+    function toString() {
+        return editor.textContent || ''
+    }
 
-    addLanguage(name: string, options: LanguageOptions) {
-      CodeJarWindow.languages[name] = options
-    },
-    setLanguage(language: string) {
-      CodeJarWindow.language = language
-      autocomplete.setLanguage(language)
-    },
+    function preventDefault(event: Event) {
+        event.preventDefault()
+    }
 
-    addTheme(_module: any) {
-      if (!_module.import || !_module.editor || !CodeJarWindow.themes) return
+    function getSelection() {
+        if (editor.parentNode?.nodeType == Node.DOCUMENT_FRAGMENT_NODE) {
+            return (editor.parentNode as Document).getSelection()!
+        }
+        return window.getSelection()!
+    }
 
-      // add options
-      CodeJarWindow.themes[_module.name] = _module
-    },
-    setTheme(name: string) {
-      if (!CodeJarWindow.themes || !CodeJarWindow.themes[name] || !editor.parentElement) return
-      const theme = CodeJarWindow.themes[name]
+    function updateCode(code: string) {
+        editor.textContent = code
+        highlight(editor)
+    }
 
-      if (document.getElementById("codejar-currentTheme")) {
-        document.getElementById("codejar-currentTheme")?.remove()
-      }
+    CodeJarWindow.setContent = updateCode
+    CodeJarWindow.saveCursor = save
+    CodeJarWindow.restoreCursor = restore
 
-      // add stylesheet
-      document.head.insertAdjacentHTML('beforeend', `<link href="${theme.import}" rel="stylesheet" id="codejar-currentTheme">`)
+    return {
+        updateOptions(newOptions: Partial<Options>) {
+            Object.assign(options, newOptions)
+        },
+        updateCode,
+        onUpdate(cb: (code: string) => void) {
+            callback = cb
+        },
 
-      // general editor
-      editor.parentElement.insertAdjacentHTML('beforeend', `<style>
+        addLanguage(name: string, options: LanguageOptions) {
+            CodeJarWindow.languages[name] = options
+        },
+        setLanguage(language: string) {
+            CodeJarWindow.language = language
+            autocomplete.setLanguage(language)
+        },
+
+        addTheme(_module: any) {
+            if (!_module.import || !_module.editor || !CodeJarWindow.themes) return
+
+            // add options
+            CodeJarWindow.themes[_module.name] = _module
+        },
+        setTheme(name: string) {
+            if (!CodeJarWindow.themes || !CodeJarWindow.themes[name] || !editor.parentElement) return
+            const theme = CodeJarWindow.themes[name]
+
+            if (document.getElementById("codejar-currentTheme")) {
+                document.getElementById("codejar-currentTheme")?.remove()
+            }
+
+            // add stylesheet
+            document.head.insertAdjacentHTML('beforeend', `<link href="${theme.import}" rel="stylesheet" id="codejar-currentTheme">`)
+
+            // general editor
+            editor.parentElement.insertAdjacentHTML('beforeend', `<style>
         #${editor.id} {
           background: ${theme.editor["editor.background"]} !important;
         }
       </style>`)
 
-      autocomplete.init(autoCompleteOptions)
-      
-      // set autocomplete options
-      autoCompleteOptions["altbackground"] = theme.editor["editor.autocomplete.background"]
-      autocomplete.destroy(autoCompleteOptions)
+            autocomplete.init(autoCompleteOptions)
 
-      // line numbers
-      const lineNumbers = document.getElementsByClassName("codejar-linenumbers")[0] as HTMLElement
-      let textColor = (theme.editor["editor.autocomplete.background"] > 127.5) as any
+            // set autocomplete options
+            autoCompleteOptions["altbackground"] = theme.editor["editor.autocomplete.background"]
+            autocomplete.destroy(autoCompleteOptions)
 
-      if (textColor === true) textColor = "#FFF"
-      else textColor = "#000 !important"
+            // line numbers
+            const lineNumbers = document.getElementsByClassName("codejar-linenumbers")[0] as HTMLElement
+            let textColor = (theme.editor["editor.autocomplete.background"] > 127.5) as any
 
-      if (!lineNumbers) return
-      lineNumbers.style.color = textColor as string
-    },
-    
-    toString,
-    save,
-    restore,
-    recordHistory,
-    destroy() {
-      for (let [type, fn] of listeners) {
-        editor.removeEventListener(type, fn)
-      }
-    },
-  }
+            if (textColor === true) textColor = "#FFF"
+            else textColor = "#000 !important"
+
+            if (!lineNumbers) return
+            lineNumbers.style.color = textColor as string
+        },
+
+        toString,
+        save,
+        restore,
+        recordHistory,
+        destroy() {
+            for (let [type, fn] of listeners) {
+                editor.removeEventListener(type, fn)
+            }
+        },
+    }
 }
