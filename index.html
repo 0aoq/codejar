@@ -47,15 +47,16 @@
     <a href="#" id="setLanguage">Change Language</a>
 </main>
 <script type="module">
-  import {CodeJar} from './codejar.js'
+  import {CodeJar} from './editor/codejar.js'
 
   import * as JavaScriptData from './languages/javascript/javascript.js'
   import * as HTMLData from './languages/html/html.js'
+  import * as LuaData from './languages/lua/lua.js'
 
   import * as agate from './themes/agate/agate.js'
   import * as github from './themes/github/github.js'
 
-  import {withLineNumbers} from './linenumbers.js'
+  import {withLineNumbers} from './editor/linenumbers.js'
 
   const editor = document.querySelector('.editor')
 
@@ -75,6 +76,7 @@
 
   jar.addLanguage('javascript', JavaScriptData)
   jar.addLanguage('html', HTMLData)
+  jar.addLanguage('lua', LuaData)
 
   jar.addTheme(agate.default)
 

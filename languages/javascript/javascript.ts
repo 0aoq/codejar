@@ -1,10 +1,17 @@
 export default {
     "language": {
         "name": "javascript",
-        "extentions": [".js", ".jsx"]
+        "extentions": [".js", ".jsx"],
+
+        "variableKeywords": ["const", "var", "let"],
+        "functionKeywords": ["function"],
+
+        "variableSplit": "=", // the character or word that comes after variable names
+        "functionSplit": "(" // the character or word that comes after the function names
     },
 
     "keywords": [
+        // [KEYWORD, TYPE, DESCRIPTION]
         ["const", "keyword", "Create a constant variable (const name = value)"],
         ["let", "keyword", "Create a variable (let name = value)"],
         ["var", "keyword", "Create a variable (var name = value)"],
@@ -88,5 +95,5 @@ export default {
         ["element.getElementsByName", "function", "Get elements by name"]
     ],
 
-    "snippets": []
+    "snippets": [],
 }

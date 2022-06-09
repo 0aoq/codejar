@@ -1,4 +1,4 @@
-import * as autocomplete from "./autocomplete.js"
+import * as autocomplete from "./autocomplete/autocomplete.js"
 
 const globalWindow = window
 

@@ -5,6 +5,7 @@ export default {
     },
 
     "keywords": [
+        // [KEYWORD, TYPE, DESCRIPTION]
         ["<html>", "tag"],
         ["<head>", "tag"],
         ["<body>", "tag"],

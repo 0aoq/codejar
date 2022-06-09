@@ -1,22 +1,22 @@
 // provide autocompletion for the codejar editor
 
-import * as cursor from "./cursor.js"
-import { CodeJarWindow } from "./codejar.js"
+import * as cursor from "../cursor.js"
+import { CodeJarWindow } from "../codejar.js"
 
 type Options = {
     class: 'codejar-autocomplete' | string
     width: '400px' | string
     backgroundColor: 245 | any
-    backgroundDarker?: 238| any // backgroundColor - 7
+    backgroundDarker?: 238 | any // backgroundColor - 7
     modalPadding: '4px' | string
     itemPadding: '4px 2rem' | string
+    maxKeywords: 10 | number
 }
 
 let _options: Options | any
 let [modal, list, descriptionField]: [any, any, any] = [null, null, null]
 let modalVisible = false
 let currentLanguageData: any = []
-// let currentLanguage = 'javascript'
 
 /**
  * Set the current language
@@ -38,7 +38,7 @@ function createItem(options: { name?: string, keyword: string, type: string, des
     options.keyword = options.keyword.replace("<", "&lt;")
     options.keyword = options.keyword.replace(">", "&gt;")
 
-    let icon =`<svg xmlns="http://www.w3.org/2000/svg" 
+    let icon = `<svg xmlns="http://www.w3.org/2000/svg" 
             width="24" 
             height="24" 
             viewBox="0 0 24 24" 
@@ -68,7 +68,22 @@ function createItem(options: { name?: string, keyword: string, type: string, des
         >
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
             <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line>
-        </svg>` 
+        </svg>`
+    } else if (options.type === "variable") {
+        icon = `<svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="24" 
+            height="24" 
+            viewBox="0 0 24 24" 
+            fill="none" stroke="currentColor" 
+            stroke-width="2" 
+            stroke-linecap="round" 
+            stroke-linejoin="round" 
+            class="feather feather-hexagon"
+            style="width: 1rem; height: 1rem; margin-top: 0rem;"
+        >
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+        </svg>`
     }
 
     // add a description
@@ -133,8 +148,13 @@ function matchAutocomplete(input: string, list: HTMLElement) {
         return
     }
 
+    let keywordsMatched = 0
+
     for (let keyword of matches) {
         // [text, type, description, isPartial, name]
+        if (keywordsMatched >= _options.maxKeywords) break
+        keywordsMatched++
+
         createItem({
             name: keyword[4],
             keyword: keyword[0],
@@ -156,6 +176,7 @@ export function init(options: Partial<Options> = {}) {
         backgroundColor: 245,
         modalPadding: '4px',
         itemPadding: '4px 8px',
+        maxKeywords: 10, // will help to improve performance by not loading too many keywords at once
         ...options
     }
 
@@ -293,6 +314,11 @@ const submitItem = (e: KeyboardEvent) => {
     if (currentItem) {
         if (!CodeJarWindow.setContent || !CodeJarWindow.saveCursor || !CodeJarWindow.restoreCursor) return
         e.preventDefault()
+
+        // if the character after the cursor is \n, return
+        if (cursor.textAfterCursor(editor).startsWith('\n')) return
+
+        // handle text insertion
         let position: any = CodeJarWindow.saveCursor()
 
         let keyword = currentItem.getAttribute('data-keyword')
@@ -320,6 +346,7 @@ const submitItem = (e: KeyboardEvent) => {
         }
 
         let lastValue = split[split.length - 1]
+        if (!lastValue) return null
         delete split[split.length - 1]
 
         let newLine = lastLine
@@ -340,7 +367,7 @@ const submitItem = (e: KeyboardEvent) => {
         // replace
         newLine = replaceLast(newLine, `${requireFunctionOpen ? "(" : ""}${lastValue}`, keyword)
         const newText = replaceOn(text, text.lastIndexOf(lastLine), newLine)
-    
+
         // add to editor
         CodeJarWindow.setContent(newText + cursor.textAfterCursor(editor))
 
@@ -387,7 +414,37 @@ const currentWordListener = (e: KeyboardEvent) => {
                 currentItem = null
                 currentItem = items[0]
                 if (currentItem) currentItem.classList.add('selected')
-            })()
+            })();
+
+            // find all variable words and then get the word directly after them
+            (() => {
+                if (!currentLanguageData.language.variableKeywords || !currentLanguageData.language.functionKeywords) return
+
+                const handleType = (line: string, keyword: string, isFunction: boolean) => {
+                    // this is a very temporary solution: if the line is not just the variable it will not work
+                    const split = line.split(keyword)
+                    if (split[0] !== "" || !split[1]) return // if split[0] is anything but "" then it isn't a match
+
+                    const variableName = split[1]
+                        .split(currentLanguageData.language.variableSplit)[0].trim()
+                        .split(currentLanguageData.language.functionSplit)[0]
+
+                    createItem({
+                        name: variableName, // get the variable name without everything past "="
+                        keyword: variableName,
+                        isPartial: false,
+                        description: `Defined on line ${editor.innerText.split("\n").indexOf(line) + 1}`,
+                        type: isFunction === false ? "variable" : "function"
+                    }, list)
+
+                    showModal()
+                }
+
+                for (let line of editor.innerText.split("\n")) {
+                    for (let keyword of currentLanguageData.language.variableKeywords) handleType(line, keyword, false)
+                    for (let keyword of currentLanguageData.language.functionKeywords) handleType(line, keyword, true)
+                }
+            })();
         } else {
             const items = list.querySelectorAll(`.${_options.class}-list-item`)
             if (items.length > 0 && modalVisible) {
@@ -420,9 +477,8 @@ const currentWordListener = (e: KeyboardEvent) => {
                         currentItem = items[0]
                         currentItem.classList.add('selected')
                     }
-                } else if (e.key === 'Enter' || e.key === 'Tab') {
-                    submitItem(e)
-                } else if (e.key === "Escape") hideModal()
+                } else if (e.key === 'Enter' || e.key === 'Tab') submitItem(e)
+                else hideModal() // hide modal whenever any other key is pressed
 
                 // update description field
                 if (currentItem) {
@@ -509,7 +565,7 @@ export function destroy(options?: any) {
     if (!modal) return
     document.getElementById("codejar-autocomlete-styles")?.remove()
 
-    for (let element of document.getElementsByClassName("codejar-autocomplete") as any) {        
+    for (let element of document.getElementsByClassName("codejar-autocomplete") as any) {
         element.remove()
     }
 
