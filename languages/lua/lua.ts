@@ -7,7 +7,7 @@ export default {
         "functionKeywords": ["function"],
 
         "variableSplit": "=", // the character or word that comes after variable names
-        "functionSplit": "do" // the character or word that comes after the function names
+        "functionSplit": "(" // the character or word that comes after the function names
     },
 
     "keywords": [
@@ -16,6 +16,7 @@ export default {
         ["function", "keyword", "Define a function"],
         ["return", "keyword", "Return code from a function"],
         ["end", "keyword", "End a function"],
+        ["print", "function", "Print a value to the console"],
 
         ["do", "keyword"],
         ["then", "keyword"],

@@ -103,6 +103,8 @@ function createItem(options: { name?: string, keyword: string, type: string, des
             <span class="codejar-keyword-type">[${options.type}]</span>
         </span>
     </li>`
+
+    return list.lastElementChild // return this item
 }
 
 /**
@@ -155,13 +157,19 @@ function matchAutocomplete(input: string, list: HTMLElement) {
         if (keywordsMatched >= _options.maxKeywords) break
         keywordsMatched++
 
-        createItem({
+        const item = createItem({
             name: keyword[4],
             keyword: keyword[0],
             type: keyword[1],
             description: keyword[2],
             isPartial: keyword[3] || false
         }, list)
+
+        item?.addEventListener('click', () => {
+            currentItem = item
+            submitItem(null)
+            hideModal()
+        })
     }
 }
 
@@ -310,13 +318,13 @@ function replaceLast(input: string, pattern: string, value: string) {
 /**
  * Submit the current item
  */
-const submitItem = (e: KeyboardEvent) => {
+const submitItem = (e: KeyboardEvent | null) => {
     if (currentItem) {
         if (!CodeJarWindow.setContent || !CodeJarWindow.saveCursor || !CodeJarWindow.restoreCursor) return
-        e.preventDefault()
+        if (e) e.preventDefault()
 
         // if the character after the cursor is \n, return
-        if (cursor.textAfterCursor(editor).startsWith('\n')) return
+        // if (cursor.textAfterCursor(editor).startsWith('\n')) return
 
         // handle text insertion
         let position: any = CodeJarWindow.saveCursor()
@@ -346,7 +354,8 @@ const submitItem = (e: KeyboardEvent) => {
         }
 
         let lastValue = split[split.length - 1]
-        if (!lastValue) return null
+        if (!lastValue || !lastLine) return null
+        
         delete split[split.length - 1]
 
         let newLine = lastLine
@@ -394,9 +403,10 @@ const currentWordListener = (e: KeyboardEvent) => {
         const _textBefore = cursor.textBeforeCursor(editor)
         if (!_textBefore) return
         const _lastCharacter = _textBefore[_textBefore.length - 1]
-        if (_lastCharacter.length <= 0 || _lastCharacter === '\t' || _lastCharacter === '\n') return
+        if (_lastCharacter.length <= 0 || /* _lastCharacter === '\t' || */ _lastCharacter === '\n') return
 
         // handle actions
+        console.log(e.key, modalVisible)
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab') {
             if (e.key === 'Backspace') return hideModal()
             const text = cursor.textBeforeCursor(editor)
@@ -447,7 +457,7 @@ const currentWordListener = (e: KeyboardEvent) => {
             })();
         } else {
             const items = list.querySelectorAll(`.${_options.class}-list-item`)
-            if (items.length > 0 && modalVisible) {
+            if (items.length > 0 /* && modalVisible */) {
                 e.preventDefault()
                 if (e.key === 'ArrowUp') {
                     if (currentItem) {
