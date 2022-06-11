@@ -406,7 +406,6 @@ const currentWordListener = (e: KeyboardEvent) => {
         if (_lastCharacter.length <= 0 || /* _lastCharacter === '\t' || */ _lastCharacter === '\n') return
 
         // handle actions
-        console.log(e.key, modalVisible)
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab') {
             if (e.key === 'Backspace') return hideModal()
             const text = cursor.textBeforeCursor(editor)
@@ -457,7 +456,7 @@ const currentWordListener = (e: KeyboardEvent) => {
             })();
         } else {
             const items = list.querySelectorAll(`.${_options.class}-list-item`)
-            if (items.length > 0 /* && modalVisible */) {
+            if (items.length > 0 && modalVisible ) {
                 e.preventDefault()
                 if (e.key === 'ArrowUp') {
                     if (currentItem) {
