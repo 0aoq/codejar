@@ -107,6 +107,9 @@ function createItem(options: { name?: string, keyword: string, type: string, des
     return list.lastElementChild // return this item
 }
 
+let currentVariables: any = [] // keeps track of all variables
+let variableNames: any = [] // keeps track of all VALID variable names
+
 /**
  * Handle autocomplete matches
  * @param {string} input 
@@ -137,7 +140,27 @@ function matchAutocomplete(input: string, list: HTMLElement) {
                 type: "snippet",
             }, list)
         }
-    })()
+    })();
+
+    (() => {
+        // handle variable match
+        if (!currentVariables) return
+
+        let identifiedVariables: any = [] // keeps track of all variables we already matched
+        
+        const _matches = currentVariables.filter((variable: any) => {
+            const regex = new RegExp(`${input}`)
+            return regex.test(variable.name[0])
+        })
+
+        for (let variable of _matches) {
+            // [name, text, description]
+            if (!identifiedVariables.includes(variable.name) && variableNames.includes(variable.name)) {
+                createItem(variable, list)
+                identifiedVariables.push(variable.name)
+            }
+        }
+    })();
 
     // normal keyword matching
     const matches = currentLanguageData.keywords.filter((keyword: any) => {
@@ -182,7 +205,7 @@ export function init(options: Partial<Options> = {}) {
         class: 'codejar-autocomplete',
         width: '400px',
         backgroundColor: 245,
-        modalPadding: '4px',
+        modalPadding: '2px',
         itemPadding: '4px 8px',
         maxKeywords: 10, // will help to improve performance by not loading too many keywords at once
         ...options
@@ -407,7 +430,7 @@ const currentWordListener = (e: KeyboardEvent) => {
 
         // handle actions
         if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter' && e.key !== 'Tab') {
-            if (e.key === 'Backspace') return hideModal()
+            if (e.key === 'Backspace' || e.key === 'Space') return hideModal()
             const text = cursor.textBeforeCursor(editor)
             const lastWord = text.split(/[^a-zA-Z.]+/g).pop()
             if (text[text.length - 1] !== " " && lastWord) currentWord = lastWord
@@ -438,15 +461,15 @@ const currentWordListener = (e: KeyboardEvent) => {
                         .split(currentLanguageData.language.variableSplit)[0].trim()
                         .split(currentLanguageData.language.functionSplit)[0]
 
-                    createItem({
+                    currentVariables.push({
                         name: variableName, // get the variable name without everything past "="
                         keyword: variableName,
                         isPartial: false,
                         description: `Defined on line ${editor.innerText.split("\n").indexOf(line) + 1}`,
                         type: isFunction === false ? "variable" : "function"
-                    }, list)
+                    })
 
-                    showModal()
+                    variableNames.push(variableName)
                 }
 
                 for (let line of editor.innerText.split("\n")) {

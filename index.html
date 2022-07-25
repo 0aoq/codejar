@@ -36,6 +36,12 @@
             tab-size: 4;
             overflow: auto;
         }
+
+        [data-error="true"] {
+          background-color: rgba(255, 87, 87, 1) !important;
+          color: white !important;
+          border-radius: 0.2rem;
+        }
     </style>
 
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
@@ -46,6 +52,11 @@
     <a href="#" id="setTheme">Change Theme</a>
     <a href="#" id="setLanguage">Change Language</a>
 </main>
+
+<!-- temp jshint link -->
+<script src="https://gitcdn.link/cdn/jshint/jshint/main/dist/jshint.js"></script>
+
+
 <script type="module">
   import {CodeJar} from './editor/codejar.js'
 
@@ -61,10 +72,37 @@
   const editor = document.querySelector('.editor')
 
   const highlight = editor => {
-    // highlight.js does not trim old tags,
-    // let's do it by this hack.
+    JSHINT(editor.textContent, {
+      esversion: 6,
+      undef: true,
+      unused: true,
+      moz: true,
+      asi: true,
+    })
+    
     editor.textContent = editor.textContent
     hljs.highlightElement(editor)
+
+    // highlight errors
+    if (JSHINT.errors) {
+      JSHINT.errors.forEach(error => {
+        // get the hljs element that contains the error and highlight it red
+        const word = editor.innerText.split('\n')[error.line - 1].slice(error.character - 1).split('(')[0].split(' ')[0]
+
+        function searchForWord(elementType) {
+          const elements = document.querySelectorAll('span')
+          for (let i = 0; i < elements.length; i++) {
+            if (elements[i].textContent === word && !elements[i].classList.contains('codejar-keyword')) {
+              elements[i].setAttribute('data-error', 'true')
+              elements[i].setAttribute('title', error.reason)
+            }
+          }
+        }
+
+        searchForWord('span')
+        searchForWord('div')
+      })
+    }
   }
 
   const jar = CodeJar(editor, withLineNumbers(highlight))
